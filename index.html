@@ -24,7 +24,7 @@
     </div>
 
     <!-- Main Container -->
-    <div class="container" id="mainContainer">
+    <div class="container" id="mainContainer" style="display:none;">
         <!-- Header -->
         <header class="header">
             <div class="logo-container">
@@ -39,7 +39,16 @@
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
                 <div class="step-indicator">
-                    <span id="currentStep">1</span> / <span id="totalSteps">6</span>
+                    <span id="currentStep">1</span> / <span id="totalSteps">7</span>
+                </div>
+                <div class="step-titles" id="stepTitles">
+                    <span class="step-title active">Personal Info</span>
+                    <span class="step-title">Next of Kin</span>
+                    <span class="step-title">Profile Photo</span>
+                    <span class="step-title">Location</span>
+                    <span class="step-title">Farmer Journey</span>
+                    <span class="step-title">Livestock</span>
+                    <span class="step-title">Consent</span>
                 </div>
             </div>
         </header>
@@ -49,27 +58,34 @@
             <form id="memberForm">
                 <!-- Step 1: Personal Information -->
                 <div class="form-step active" id="step1">
-                    <h2><i class="fas fa-user-circle"></i> Personal Information</h2>
+                    <div class="step-header">
+                        <h2><i class="fas fa-user-circle"></i> Personal Information</h2>
+                        <div class="step-guide">
+                            <i class="fas fa-info-circle"></i>
+                            <p>Please fill in your personal details accurately. Fields marked with * are required.</p>
+                        </div>
+                    </div>
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="fullName">Full Name *</label>
-                            <input type="text" id="fullName" required placeholder="Enter full name">
+                            <input type="text" id="fullName" name="fullName" required placeholder="Enter full name">
                         </div>
                         <div class="form-group">
                             <label for="phone">Phone Number *</label>
-                            <input type="tel" id="phone" required placeholder="+254 XXX XXX XXX" pattern="^\+254[0-9]{9}$">
+                            <input type="tel" id="phone" name="phone" required placeholder="+254 XXX XXX XXX">
+                            <small class="help-text">Format: +254 7XX XXX XXX</small>
                         </div>
                         <div class="form-group">
                             <label for="email">Email Address</label>
-                            <input type="email" id="email" placeholder="farmer@example.com">
+                            <input type="email" id="email" name="email" placeholder="farmer@example.com">
                         </div>
                         <div class="form-group">
                             <label for="dob">Date of Birth *</label>
-                            <input type="date" id="dob" required>
+                            <input type="date" id="dob" name="dob" required>
                         </div>
                         <div class="form-group">
                             <label for="maritalStatus">Marital Status</label>
-                            <select id="maritalStatus">
+                            <select id="maritalStatus" name="maritalStatus">
                                 <option value="">Select status</option>
                                 <option value="single">Single</option>
                                 <option value="married">Married</option>
@@ -79,39 +95,55 @@
                         </div>
                         <div class="form-group">
                             <label for="nationality">Nationality *</label>
-                            <select id="nationality" required>
+                            <select id="nationality" name="nationality" required>
                                 <option value="">Select nationality</option>
                                 <option value="Kenyan">Kenyan</option>
                                 <option value="International">International</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="idNumber">ID Number *</label>
-                            <input type="text" id="idNumber" required placeholder="Enter ID number">
+                            <label for="idNumber">ID Number/Passport *</label>
+                            <input type="text" id="idNumber" name="idNumber" required placeholder="Enter ID or Passport number">
                         </div>
                     </div>
                 </div>
 
                 <!-- Step 2: Next of Kin (Multiple) -->
                 <div class="form-step" id="step2">
-                    <h2><i class="fas fa-users"></i> Next of Kin Information</h2>
+                    <div class="step-header">
+                        <h2><i class="fas fa-users"></i> Next of Kin Information</h2>
+                        <div class="step-guide">
+                            <i class="fas fa-info-circle"></i>
+                            <p>Add your next of kin details. You can add multiple entries. If next of kin is under 18, provide birth certificate number.</p>
+                        </div>
+                    </div>
                     <div id="nextOfKinContainer">
                         <div class="next-of-kin-entry">
                             <div class="form-grid">
                                 <div class="form-group">
-                                    <label>Next of Kin Name</label>
-                                    <input type="text" class="nok-name" placeholder="Full name">
+                                    <label>Next of Kin Name *</label>
+                                    <input type="text" class="nok-name" name="nok-name[]" required placeholder="Full name">
                                 </div>
                                 <div class="form-group">
-                                    <label>Relationship</label>
-                                    <input type="text" class="nok-relationship" placeholder="e.g., Spouse, Parent">
+                                    <label>Relationship *</label>
+                                    <input type="text" class="nok-relationship" name="nok-relationship[]" required placeholder="e.g., Spouse, Parent">
                                 </div>
                                 <div class="form-group">
-                                    <label>Next of Kin Contact</label>
-                                    <input type="tel" class="nok-contact" placeholder="Phone number">
+                                    <label>Next of Kin Contact *</label>
+                                    <input type="tel" class="nok-contact" name="nok-contact[]" required placeholder="Phone number">
+                                </div>
+                                <div class="form-group">
+                                    <label>Birth Certificate Number (If under 18)</label>
+                                    <input type="text" class="nok-birth-cert" name="nok-birth-cert[]" placeholder="Enter if next of kin is under 18">
+                                </div>
+                                <div class="form-group">
+                                    <label>Age</label>
+                                    <input type="number" class="nok-age" name="nok-age[]" min="0" max="120" placeholder="Age in years">
                                 </div>
                             </div>
-                            <button type="button" class="btn-remove-nok" onclick="removeNextOfKin(this)">Remove</button>
+                            <button type="button" class="btn-remove-nok" onclick="removeNextOfKin(this)">
+                                <i class="fas fa-trash"></i> Remove
+                            </button>
                         </div>
                     </div>
                     <button type="button" class="btn-secondary" onclick="addNextOfKin()">
@@ -121,7 +153,13 @@
 
                 <!-- Step 3: Profile Picture -->
                 <div class="form-step" id="step3">
-                    <h2><i class="fas fa-camera"></i> Profile Picture</h2>
+                    <div class="step-header">
+                        <h2><i class="fas fa-camera"></i> Profile Picture</h2>
+                        <div class="step-guide">
+                            <i class="fas fa-info-circle"></i>
+                            <p>Take a clear photo of yourself. You can switch between front and rear cameras. Camera will turn off automatically after taking photo.</p>
+                        </div>
+                    </div>
                     <div class="camera-container">
                         <div class="camera-preview">
                             <video id="cameraView" autoplay playsinline></video>
@@ -145,7 +183,7 @@
                                 <button type="button" class="btn-primary" id="capturePhoto">
                                     <i class="fas fa-camera"></i> Take Photo
                                 </button>
-                                <button type="button" class="btn-secondary" id="retakePhoto">
+                                <button type="button" class="btn-secondary" id="retakePhoto" style="display:none;">
                                     <i class="fas fa-redo"></i> Retake
                                 </button>
                             </div>
@@ -155,27 +193,33 @@
 
                 <!-- Step 4: Location Information -->
                 <div class="form-step" id="step4">
-                    <h2><i class="fas fa-map-marker-alt"></i> Location Information</h2>
+                    <div class="step-header">
+                        <h2><i class="fas fa-map-marker-alt"></i> Location Information</h2>
+                        <div class="step-guide">
+                            <i class="fas fa-info-circle"></i>
+                            <p>Provide your farm location details. You can use the button to get your current GPS coordinates.</p>
+                        </div>
+                    </div>
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="county">County *</label>
-                            <input type="text" id="county" required placeholder="Enter county">
+                            <input type="text" id="county" name="county" required placeholder="Enter county">
                         </div>
                         <div class="form-group">
                             <label for="subCounty">Sub-County *</label>
-                            <input type="text" id="subCounty" required placeholder="Enter sub-county">
+                            <input type="text" id="subCounty" name="subCounty" required placeholder="Enter sub-county">
                         </div>
                         <div class="form-group">
                             <label for="ward">Ward</label>
-                            <input type="text" id="ward" placeholder="Enter ward">
+                            <input type="text" id="ward" name="ward" placeholder="Enter ward">
                         </div>
                         <div class="form-group">
                             <label for="village">Village/Location</label>
-                            <input type="text" id="village" placeholder="Enter village">
+                            <input type="text" id="village" name="village" placeholder="Enter village">
                         </div>
-                        <div class="form-group">
+                        <div class="form-group full-width">
                             <label for="physicalAddress">Physical Address *</label>
-                            <textarea id="physicalAddress" required placeholder="Enter physical address" rows="3"></textarea>
+                            <textarea id="physicalAddress" name="physicalAddress" required placeholder="Enter physical address" rows="3"></textarea>
                         </div>
                     </div>
                     <div class="gps-section">
@@ -183,42 +227,54 @@
                         <div class="form-grid">
                             <div class="form-group">
                                 <label for="latitude">Latitude</label>
-                                <input type="number" id="latitude" step="0.000001" placeholder="e.g., -1.292066">
+                                <input type="number" id="latitude" name="latitude" step="0.000001" placeholder="e.g., -1.292066">
                             </div>
                             <div class="form-group">
                                 <label for="longitude">Longitude</label>
-                                <input type="number" id="longitude" step="0.000001" placeholder="e.g., 36.821945">
+                                <input type="number" id="longitude" name="longitude" step="0.000001" placeholder="e.g., 36.821945">
                             </div>
                         </div>
                         <button type="button" class="btn-secondary" id="getCurrentLocation">
                             <i class="fas fa-location-arrow"></i> Get My Current Location
                         </button>
-                        <p class="help-text">This will use your device's GPS to get your current location</p>
+                        <p class="help-text">This will use your device's GPS to get your current location. Make sure location services are enabled.</p>
                     </div>
                 </div>
 
                 <!-- Step 5: Farmer Journey -->
                 <div class="form-step" id="step5">
-                    <h2><i class="fas fa-seedling"></i> Farmer Journey</h2>
+                    <div class="step-header">
+                        <h2><i class="fas fa-seedling"></i> Farmer Journey</h2>
+                        <div class="step-guide">
+                            <i class="fas fa-info-circle"></i>
+                            <p>Tell us about your farming experience and future plans. This helps us understand your needs better.</p>
+                        </div>
+                    </div>
                     <div class="form-group">
                         <label for="farmerDescription">Brief Description & Journey *</label>
-                        <textarea id="farmerDescription" required placeholder="Tell us about yourself and your farming journey..." rows="5"></textarea>
+                        <textarea id="farmerDescription" name="farmerDescription" required placeholder="Tell us about yourself and your farming journey..." rows="5"></textarea>
                     </div>
                     <div class="form-group">
                         <label for="futureGoals">Future Goals & Vision *</label>
-                        <textarea id="futureGoals" required placeholder="What are your goals and vision for your livestock farming?" rows="5"></textarea>
+                        <textarea id="futureGoals" name="futureGoals" required placeholder="What are your goals and vision for your livestock farming?" rows="5"></textarea>
                     </div>
                 </div>
 
                 <!-- Step 6: Livestock Information (KYC) -->
                 <div class="form-step" id="step6">
-                    <h2><i class="fas fa-paw"></i> Livestock Information (KYC)</h2>
+                    <div class="step-header">
+                        <h2><i class="fas fa-paw"></i> Livestock Information</h2>
+                        <div class="step-guide">
+                            <i class="fas fa-info-circle"></i>
+                            <p>Add information about your livestock. You can take photos with your camera or upload existing photos.</p>
+                        </div>
+                    </div>
                     <div id="livestockContainer">
                         <div class="livestock-entry">
                             <div class="form-grid">
                                 <div class="form-group">
-                                    <label>Type of Livestock</label>
-                                    <select class="livestock-type">
+                                    <label>Type of Livestock *</label>
+                                    <select class="livestock-type" name="livestock-type[]" required>
                                         <option value="">Select type...</option>
                                         <option value="Cattle">Cattle</option>
                                         <option value="Goat">Goat</option>
@@ -230,35 +286,122 @@
                                 </div>
                                 <div class="form-group">
                                     <label>Produce</label>
-                                    <select class="livestock-produce">
+                                    <select class="livestock-produce" name="livestock-produce[]">
                                         <option value="">Select produce...</option>
                                         <option value="Milk">Milk</option>
                                         <option value="Eggs">Eggs</option>
                                         <option value="Meat">Meat</option>
                                         <option value="Wool">Wool</option>
+                                        <option value="Manure">Manure</option>
                                         <option value="Other">Other</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label>Number of Animals</label>
-                                    <input type="number" class="livestock-count" min="0" placeholder="0">
+                                    <label>Number of Animals *</label>
+                                    <input type="number" class="livestock-count" name="livestock-count[]" min="1" required placeholder="0">
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label>Additional Info (Age, Height, etc.)</label>
-                                <textarea class="livestock-info" placeholder="Optional information about the animals..." rows="2"></textarea>
+                                <label>Additional Info (Breed, Age, etc.)</label>
+                                <textarea class="livestock-info" name="livestock-info[]" placeholder="Optional information about the animals..." rows="2"></textarea>
                             </div>
-                            <div class="form-group">
-                                <label>Animal Photo (Optional)</label>
-                                <input type="file" class="livestock-photo" accept="image/*" multiple>
-                                <small class="help-text">You can upload a single photo representing the group of animals</small>
+                            
+                            <div class="livestock-photo-section">
+                                <h4><i class="fas fa-camera"></i> Animal Photo</h4>
+                                <div class="photo-options">
+                                    <button type="button" class="btn-secondary take-livestock-photo">
+                                        <i class="fas fa-camera"></i> Take Photo with Camera
+                                    </button>
+                                    <span class="or-divider">OR</span>
+                                    <div class="upload-option">
+                                        <input type="file" class="livestock-photo-input" accept="image/*" multiple style="display:none;">
+                                        <button type="button" class="btn-secondary upload-livestock-photo">
+                                            <i class="fas fa-upload"></i> Upload Photo
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="livestock-photo-preview" style="display:none;">
+                                    <div class="photo-thumbnails" id="livestockPhotoThumbnails"></div>
+                                    <button type="button" class="btn-remove-photo">
+                                        <i class="fas fa-trash"></i> Remove Photo
+                                    </button>
+                                </div>
                             </div>
-                            <button type="button" class="btn-remove-livestock" onclick="removeLivestockEntry(this)">Remove This Entry</button>
+                            
+                            <button type="button" class="btn-remove-livestock" onclick="removeLivestockEntry(this)">
+                                <i class="fas fa-trash"></i> Remove This Entry
+                            </button>
                         </div>
                     </div>
                     <button type="button" class="btn-secondary" onclick="addLivestockEntry()">
                         <i class="fas fa-plus"></i> Add Another Livestock Type
                     </button>
+                </div>
+
+                <!-- Step 7: Consent and Signature -->
+                <div class="form-step" id="step7">
+                    <div class="step-header">
+                        <h2><i class="fas fa-file-signature"></i> Consent & Signature</h2>
+                        <div class="step-guide">
+                            <i class="fas fa-info-circle"></i>
+                            <p>Please read the consent statement carefully and provide your signature to confirm.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="consent-section">
+                        <div class="consent-box">
+                            <h3><i class="fas fa-shield-alt"></i> Data Collection Consent</h3>
+                            <div class="consent-content">
+                                <p>I, <strong id="consentName"></strong>, hereby consent to the collection and processing of my personal data as follows:</p>
+                                
+                                <ul>
+                                    <li><i class="fas fa-check-circle"></i> I agree to provide accurate personal information for registration with Muthegi Group</li>
+                                    <li><i class="fas fa-check-circle"></i> I consent to the collection of location data for farm mapping purposes</li>
+                                    <li><i class="fas fa-check-circle"></i> I agree to have my photograph taken for identification purposes</li>
+                                    <li><i class="fas fa-check-circle"></i> I consent to the collection of livestock data for agricultural support services</li>
+                                    <li><i class="fas fa-check-circle"></i> I understand this data will be used for group administration, funding applications, and agricultural support</li>
+                                    <li><i class="fas fa-check-circle"></i> I acknowledge that I can request access to or deletion of my data at any time</li>
+                                    <li><i class="fas fa-check-circle"></i> I agree to receive communications related to group activities and agricultural support</li>
+                                </ul>
+                                
+                                <div class="consent-date">
+                                    <p>Date: <span id="currentDate"></span></p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="signature-section">
+                            <h3><i class="fas fa-signature"></i> Digital Signature</h3>
+                            <div class="signature-container">
+                                <div class="signature-pad">
+                                    <canvas id="signatureCanvas"></canvas>
+                                    <div class="signature-placeholder" id="signaturePlaceholder">
+                                        <i class="fas fa-signature fa-3x"></i>
+                                        <p>Sign here using your finger or mouse</p>
+                                    </div>
+                                </div>
+                                <div class="signature-controls">
+                                    <button type="button" class="btn-secondary" id="clearSignature">
+                                        <i class="fas fa-eraser"></i> Clear Signature
+                                    </button>
+                                    <button type="button" class="btn-secondary" id="undoSignature">
+                                        <i class="fas fa-undo"></i> Undo
+                                    </button>
+                                </div>
+                                <p class="help-text">Draw your signature in the box above. This will serve as your digital consent.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="consent-checkbox">
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="agreeConsent" name="agreeConsent" required>
+                                <span class="checkmark"></span>
+                                <span class="checkbox-label">
+                                    I have read and understood the consent statement above and agree to the terms and conditions.
+                                </span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Navigation Buttons -->
@@ -293,10 +436,34 @@
         <div class="notification-container" id="notificationContainer"></div>
     </div>
 
+    <!-- Livestock Camera Modal -->
+    <div class="modal" id="livestockCameraModal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-camera"></i> Take Livestock Photo</h3>
+                <button class="close-modal" onclick="closeLivestockCamera()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="camera-preview">
+                    <video id="livestockCameraView" autoplay playsinline></video>
+                    <canvas id="livestockPhotoCanvas" style="display:none;"></canvas>
+                </div>
+                <div class="camera-controls">
+                    <select id="livestockCameraSelect">
+                        <option value="">Select camera...</option>
+                    </select>
+                    <button type="button" class="btn-secondary" id="switchLivestockCamera">
+                        <i class="fas fa-sync-alt"></i> Switch Camera
+                    </button>
+                    <button type="button" class="btn-primary" id="captureLivestockPhoto">
+                        <i class="fas fa-camera"></i> Take Photo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
-    <script src="security.js"></script>
-    <script src="cloudinary-uploader.js"></script>
-    <script src="firebase-db.js"></script>
     <script src="script.js"></script>
 </body>
-                                      </html>
+</html>
