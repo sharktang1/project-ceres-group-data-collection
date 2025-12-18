@@ -1004,6 +1004,49 @@ input[type="tel"] {
 .notification.info:first-of-type {
     display: flex; /* Show only the first info notification */
 }
+
+  /* Form validation styling */
+.form-group input:invalid,
+.form-group select:invalid,
+.form-group textarea:invalid {
+    border-color: var(--danger);
+    background-color: rgba(239, 68, 68, 0.05);
+}
+
+.form-group input:invalid:focus,
+.form-group select:invalid:focus,
+.form-group textarea:invalid:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+/* Signature canvas improvements */
+#signatureCanvas {
+    touch-action: none; /* Prevent scrolling when drawing */
+    cursor: crosshair;
+}
+
+.signature-pad {
+    touch-action: none; /* Important for touch devices */
+}
+
+/* Make signature work better with mouse */
+.signature-pad.active {
+    cursor: crosshair;
+}
+
+/* Error message styling */
+.form-group .error-message {
+    color: var(--danger);
+    font-size: 0.85rem;
+    margin-top: 5px;
+    display: none;
+}
+
+.form-group input:invalid + .error-message,
+.form-group select:invalid + .error-message,
+.form-group textarea:invalid + .error-message {
+    display: block;
+}
     
     .signature-controls {
         flex-direction: column;
