@@ -10,6 +10,44 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/x-icon" href="https://res.cloudinary.com/dpymwa41m/image/upload/v1762274479/Gemini_Generated_Image_q2kbiiq2kbiiq2kb-removebg-preview_zw2pnk.png">
+    <style>
+        /* Additional styles for signature fix */
+        .signature-pad {
+            cursor: crosshair;
+            touch-action: none;
+        }
+        
+        /* Fix for date input validation */
+        input[type="date"]:invalid {
+            border-color: var(--danger);
+        }
+        
+        input[type="date"]:valid {
+            border-color: var(--slate-light);
+        }
+        
+        /* Hide browser's default validation messages */
+        input:invalid, select:invalid, textarea:invalid {
+            box-shadow: none;
+        }
+        
+        /* Custom validation styling */
+        .validation-error {
+            border-color: var(--danger) !important;
+            background-color: rgba(239, 68, 68, 0.05);
+        }
+        
+        .validation-error-message {
+            color: var(--danger);
+            font-size: 0.85rem;
+            margin-top: 5px;
+            display: none;
+        }
+        
+        .validation-error-message.show {
+            display: block;
+        }
+    </style>
 </head>
 <body>
     <!-- Loading Overlay -->
@@ -55,7 +93,7 @@
 
         <!-- Form Steps -->
         <main class="form-container">
-            <form id="memberForm">
+            <form id="memberForm" novalidate>
                 <!-- Step 1: Personal Information -->
                 <div class="form-step active" id="step1">
                     <div class="step-header">
@@ -69,22 +107,25 @@
                         <div class="form-group">
                             <label for="fullName">Full Name *</label>
                             <input type="text" id="fullName" name="fullName" required placeholder="Enter full name">
+                            <div class="validation-error-message" id="fullNameError">Please enter your full name</div>
                         </div>
                         <div class="form-group">
                             <label for="phone">Phone Number *</label>
                             <input type="tel" id="phone" name="phone" required 
-                                   placeholder="+254757432966 or 0757432966"
-                                   pattern="^(\+254|0)[17]\d{8}$"
-                                   title="Enter a valid Kenyan phone number (e.g., +254757432966 or 0757432966)">
-                            <small class="help-text">Format: +2547XXXXXXXX or 07XXXXXXXX (10 digits total)</small>
+                                   placeholder="e.g., 0757432966 or +254757432966"
+                                   data-pattern="^(\\+254|0)[17]\\d{8}$">
+                            <div class="validation-error-message" id="phoneError">Please enter a valid Kenyan phone number (e.g., 0757432966 or +254757432966)</div>
+                            <small class="help-text">Format: 07XXXXXXXX or +2547XXXXXXXX (10 digits total)</small>
                         </div>
                         <div class="form-group">
                             <label for="email">Email Address</label>
                             <input type="email" id="email" name="email" placeholder="farmer@example.com">
+                            <div class="validation-error-message" id="emailError">Please enter a valid email address</div>
                         </div>
                         <div class="form-group">
                             <label for="dob">Date of Birth *</label>
                             <input type="date" id="dob" name="dob" required>
+                            <div class="validation-error-message" id="dobError">Please enter your date of birth (must be at least 18 years old)</div>
                         </div>
                         <div class="form-group">
                             <label for="maritalStatus">Marital Status</label>
@@ -103,10 +144,12 @@
                                 <option value="Kenyan">Kenyan</option>
                                 <option value="International">International</option>
                             </select>
+                            <div class="validation-error-message" id="nationalityError">Please select your nationality</div>
                         </div>
                         <div class="form-group">
                             <label for="idNumber">ID Number/Passport *</label>
                             <input type="text" id="idNumber" name="idNumber" required placeholder="Enter ID or Passport number">
+                            <div class="validation-error-message" id="idNumberError">Please enter your ID or Passport number</div>
                         </div>
                     </div>
                 </div>
@@ -126,17 +169,19 @@
                                 <div class="form-group">
                                     <label>Next of Kin Name *</label>
                                     <input type="text" class="nok-name" name="nok-name[]" required placeholder="Full name">
+                                    <div class="validation-error-message nok-name-error">Please enter next of kin name</div>
                                 </div>
                                 <div class="form-group">
                                     <label>Relationship *</label>
                                     <input type="text" class="nok-relationship" name="nok-relationship[]" required placeholder="e.g., Spouse, Parent">
+                                    <div class="validation-error-message nok-relationship-error">Please enter relationship</div>
                                 </div>
                                 <div class="form-group">
                                     <label>Next of Kin Contact *</label>
                                     <input type="tel" class="nok-contact" name="nok-contact[]" required 
-                                       placeholder="Phone number"
-                                       pattern="^(\+254|0)[17]\d{8}$"
-                                       title="Enter a valid Kenyan phone number">
+                                           placeholder="Phone number"
+                                           data-pattern="^(\\+254|0)[17]\\d{8}$">
+                                    <div class="validation-error-message nok-contact-error">Please enter a valid phone number</div>
                                 </div>
                                 <div class="form-group">
                                     <label>Birth Certificate Number (If under 18)</label>
@@ -210,10 +255,12 @@
                         <div class="form-group">
                             <label for="county">County *</label>
                             <input type="text" id="county" name="county" required placeholder="Enter county">
+                            <div class="validation-error-message" id="countyError">Please enter county</div>
                         </div>
                         <div class="form-group">
                             <label for="subCounty">Sub-County *</label>
                             <input type="text" id="subCounty" name="subCounty" required placeholder="Enter sub-county">
+                            <div class="validation-error-message" id="subCountyError">Please enter sub-county</div>
                         </div>
                         <div class="form-group">
                             <label for="ward">Ward</label>
@@ -226,6 +273,7 @@
                         <div class="form-group full-width">
                             <label for="physicalAddress">Physical Address *</label>
                             <textarea id="physicalAddress" name="physicalAddress" required placeholder="Enter physical address" rows="3"></textarea>
+                            <div class="validation-error-message" id="physicalAddressError">Please enter physical address</div>
                         </div>
                     </div>
                     <div class="gps-section">
@@ -259,10 +307,12 @@
                     <div class="form-group">
                         <label for="farmerDescription">Brief Description & Journey *</label>
                         <textarea id="farmerDescription" name="farmerDescription" required placeholder="Tell us about yourself and your farming journey..." rows="5"></textarea>
+                        <div class="validation-error-message" id="farmerDescriptionError">Please tell us about your farming journey</div>
                     </div>
                     <div class="form-group">
                         <label for="futureGoals">Future Goals & Vision *</label>
                         <textarea id="futureGoals" name="futureGoals" required placeholder="What are your goals and vision for your livestock farming?" rows="5"></textarea>
+                        <div class="validation-error-message" id="futureGoalsError">Please share your future goals and vision</div>
                     </div>
                 </div>
 
@@ -289,6 +339,7 @@
                                         <option value="Pig">Pig</option>
                                         <option value="Other">Other</option>
                                     </select>
+                                    <div class="validation-error-message livestock-type-error">Please select livestock type</div>
                                 </div>
                                 <div class="form-group">
                                     <label>Produce</label>
@@ -305,6 +356,7 @@
                                 <div class="form-group">
                                     <label>Number of Animals *</label>
                                     <input type="number" class="livestock-count" name="livestock-count[]" min="1" required placeholder="0">
+                                    <div class="validation-error-message livestock-count-error">Please enter number of animals (minimum 1)</div>
                                 </div>
                             </div>
                             <div class="form-group">
@@ -383,7 +435,7 @@
                                     <canvas id="signatureCanvas"></canvas>
                                     <div class="signature-placeholder" id="signaturePlaceholder">
                                         <i class="fas fa-signature fa-3x"></i>
-                                        <p>Sign here using your finger or mouse</p>
+                                        <p>Sign here using your finger, mouse, or touchpad</p>
                                     </div>
                                 </div>
                                 <div class="signature-controls">
@@ -394,7 +446,8 @@
                                         <i class="fas fa-undo"></i> Undo
                                     </button>
                                 </div>
-                                <p class="help-text">Draw your signature in the box above. This will serve as your digital consent.</p>
+                                <p class="help-text">Draw your signature in the box above using mouse, touchpad, or touchscreen.</p>
+                                <div class="validation-error-message" id="signatureError">Please provide your digital signature</div>
                             </div>
                         </div>
                         
@@ -406,6 +459,7 @@
                                     I have read and understood the consent statement above and agree to the terms and conditions.
                                 </span>
                             </label>
+                            <div class="validation-error-message" id="consentError">Please agree to the consent statement</div>
                         </div>
                     </div>
                 </div>
@@ -471,5 +525,209 @@
 
     <!-- Scripts -->
     <script src="script.js"></script>
+    <script>
+        // Fix for validation errors - Remove pattern attributes that cause issues
+        document.addEventListener('DOMContentLoaded', function() {
+            // Remove problematic pattern attributes
+            const phoneInputs = document.querySelectorAll('input[type="tel"]');
+            phoneInputs.forEach(input => {
+                input.removeAttribute('pattern');
+            });
+            
+            // Set up date validation
+            const dobInput = document.getElementById('dob');
+            if (dobInput) {
+                // Set max date (18 years ago)
+                const today = new Date();
+                const maxDate = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+                dobInput.max = maxDate.toISOString().split('T')[0];
+                
+                // Set min date (100 years ago)
+                const minDate = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
+                dobInput.min = minDate.toISOString().split('T')[0];
+                
+                // Add custom validation
+                dobInput.addEventListener('change', function() {
+                    validateDateInput(this);
+                });
+            }
+            
+            // Add custom validation for phone inputs
+            phoneInputs.forEach(input => {
+                input.addEventListener('blur', function() {
+                    validatePhoneInput(this);
+                });
+                input.addEventListener('input', function() {
+                    // Clear validation error as user types
+                    clearValidationError(this);
+                });
+            });
+            
+            // Add validation for all required inputs
+            const requiredInputs = document.querySelectorAll('input[required], select[required], textarea[required]');
+            requiredInputs.forEach(input => {
+                input.addEventListener('blur', function() {
+                    validateRequiredInput(this);
+                });
+                input.addEventListener('input', function() {
+                    clearValidationError(this);
+                });
+            });
+        });
+        
+        function validateDateInput(input) {
+            const value = input.value;
+            if (!value) {
+                showValidationError(input, 'Please enter your date of birth');
+                return false;
+            }
+            
+            const selectedDate = new Date(value);
+            const minDate = new Date(input.min);
+            const maxDate = new Date(input.max);
+            
+            if (selectedDate < minDate || selectedDate > maxDate) {
+                showValidationError(input, `Date must be between ${formatDate(minDate)} and ${formatDate(maxDate)}`);
+                return false;
+            }
+            
+            clearValidationError(input);
+            return true;
+        }
+        
+        function validatePhoneInput(input) {
+            const value = input.value.replace(/\s/g, '');
+            const pattern = input.getAttribute('data-pattern');
+            
+            if (!value) {
+                showValidationError(input, 'Please enter a phone number');
+                return false;
+            }
+            
+            if (pattern) {
+                const regex = new RegExp(pattern);
+                if (!regex.test(value)) {
+                    showValidationError(input, 'Please enter a valid Kenyan phone number (e.g., 0757432966 or +254757432966)');
+                    return false;
+                }
+            }
+            
+            clearValidationError(input);
+            return true;
+        }
+        
+        function validateRequiredInput(input) {
+            const value = input.value.trim();
+            
+            if (!value) {
+                const fieldName = input.previousElementSibling?.textContent || 'This field';
+                showValidationError(input, `${fieldName} is required`);
+                return false;
+            }
+            
+            clearValidationError(input);
+            return true;
+        }
+        
+        function showValidationError(input, message) {
+            input.classList.add('validation-error');
+            const errorDiv = input.nextElementSibling;
+            if (errorDiv && errorDiv.classList.contains('validation-error-message')) {
+                errorDiv.textContent = message;
+                errorDiv.classList.add('show');
+            }
+        }
+        
+        function clearValidationError(input) {
+            input.classList.remove('validation-error');
+            const errorDiv = input.nextElementSibling;
+            if (errorDiv && errorDiv.classList.contains('validation-error-message')) {
+                errorDiv.classList.remove('show');
+            }
+        }
+        
+        function formatDate(date) {
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+        
+        // Override the global form validation
+        function customFormValidation() {
+            let isValid = true;
+            const currentStep = projectCeresForm?.currentStep || 1;
+            const stepId = `step${currentStep}`;
+            const step = document.getElementById(stepId);
+            
+            if (!step) return true;
+            
+            // Validate all required fields in current step
+            const requiredInputs = step.querySelectorAll('[required]');
+            requiredInputs.forEach(input => {
+                if (input.type === 'tel') {
+                    if (!validatePhoneInput(input)) isValid = false;
+                } else if (input.type === 'date') {
+                    if (!validateDateInput(input)) isValid = false;
+                } else if (input.type === 'checkbox') {
+                    if (!input.checked) {
+                        showValidationError(input, 'This agreement is required');
+                        isValid = false;
+                    } else {
+                        clearValidationError(input);
+                    }
+                } else {
+                    if (!validateRequiredInput(input)) isValid = false;
+                }
+            });
+            
+            // Special validation for signature
+            if (currentStep === 7 && !projectCeresForm?.signatureData) {
+                const signatureError = document.getElementById('signatureError');
+                if (signatureError) {
+                    signatureError.classList.add('show');
+                    isValid = false;
+                }
+            } else if (currentStep === 7) {
+                const signatureError = document.getElementById('signatureError');
+                if (signatureError) {
+                    signatureError.classList.remove('show');
+                }
+            }
+            
+            return isValid;
+        }
+        
+        // Override the nextStep function
+        window.nextStep = function() {
+            if (customFormValidation()) {
+                projectCeresForm.nextStep();
+            } else {
+                // Scroll to first error
+                const firstError = document.querySelector('.validation-error');
+                if (firstError) {
+                    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    firstError.focus();
+                }
+            }
+        };
+        
+        // Override the submit function
+        const originalSubmit = document.getElementById('memberForm').onsubmit;
+        document.getElementById('memberForm').onsubmit = function(e) {
+            e.preventDefault();
+            if (customFormValidation()) {
+                projectCeresForm.submitForm();
+            } else {
+                // Scroll to first error
+                const firstError = document.querySelector('.validation-error');
+                if (firstError) {
+                    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    firstError.focus();
+                }
+            }
+        };
+    </script>
 </body>
 </html>
