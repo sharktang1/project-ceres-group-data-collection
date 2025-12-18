@@ -48,6 +48,10 @@ class ProjectCeresForm {
         this.analytics = null;
         this.firebaseInitialized = false;
         
+        // Notification control
+        this.notificationsEnabled = true;
+        this.shownNotifications = new Set();
+        
         this.init();
     }
 
@@ -58,7 +62,8 @@ class ProjectCeresForm {
             setTimeout(() => {
                 document.getElementById('loadingOverlay').style.display = 'none';
                 document.getElementById('mainContainer').style.display = 'block';
-                this.showNotification('Welcome to Project Ceres Data Collection Form', 'info');
+                // Show only welcome notification
+                this.showNotification('Welcome to Project Ceres Data Collection Form', 'info', true);
             }, 300);
         }, 1500);
 
@@ -79,7 +84,7 @@ class ProjectCeresForm {
             this.submitForm();
         });
         
-        // Show initial guide
+        // Show initial guide (only once)
         setTimeout(() => {
             this.showStepGuide();
         }, 2000);
@@ -119,11 +124,12 @@ class ProjectCeresForm {
             this.firebaseInitialized = true;
             
             console.log('Firebase initialized successfully');
-            this.showNotification('Database connection established', 'success');
+            // Don't show notification for Firebase initialization
             
         } catch (error) {
             console.error('Firebase initialization error:', error);
-            this.showNotification('Database connection failed. Data will be saved locally.', 'error');
+            // Only show error notification
+            this.showNotification('Database connection failed. Data will be saved locally.', 'error', true);
         }
     }
 
@@ -137,19 +143,35 @@ class ProjectCeresForm {
         const minDate = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
         document.getElementById('dob').min = minDate.toISOString().split('T')[0];
         
-        // Phone number formatting - Fixed pattern issue
+        // Phone number handling - SIMPLIFIED
         document.getElementById('phone').addEventListener('input', (e) => {
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.startsWith('254')) {
-                value = '+' + value;
-            } else if (value.startsWith('0')) {
-                value = '+254' + value.substring(1);
+            let value = e.target.value.replace(/\D/g, ''); // Remove all non-digits
+            
+            // Convert to +254 format if starts with 0
+            if (value.startsWith('0') && value.length > 1) {
+                value = '254' + value.substring(1);
             }
-            e.target.value = this.formatPhoneNumber(value);
+            
+            // Limit to 12 digits (254 + 9 digits)
+            if (value.length > 12) {
+                value = value.substring(0, 12);
+            }
+            
+            // Format for display (optional)
+            if (value.length >= 3) {
+                e.target.value = '+' + value;
+            } else if (value.length > 0) {
+                e.target.value = value;
+            }
         });
         
-        // Remove the problematic pattern attribute
-        document.getElementById('phone').removeAttribute('pattern');
+        // Add blur event to format on lose focus
+        document.getElementById('phone').addEventListener('blur', (e) => {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.startsWith('254') && value.length === 12) {
+                e.target.value = '+254' + value.substring(3, 6) + ' ' + value.substring(6, 9) + ' ' + value.substring(9);
+            }
+        });
         
         // Set current date for consent
         document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', {
@@ -157,17 +179,49 @@ class ProjectCeresForm {
             month: 'long',
             day: 'numeric'
         });
+        
+        // Initialize Next of Kin phone fields
+        this.setupDynamicPhoneFields();
     }
 
-    formatPhoneNumber(phone) {
-        const cleaned = phone.replace(/\D/g, '');
-        if (cleaned.length <= 3) {
-            return '+' + cleaned;
-        } else if (cleaned.length <= 6) {
-            return '+' + cleaned.slice(0, 3) + ' ' + cleaned.slice(3);
-        } else {
-            return '+' + cleaned.slice(0, 3) + ' ' + cleaned.slice(3, 6) + ' ' + cleaned.slice(6, 9);
+    setupDynamicPhoneFields() {
+        // Set up event delegation for dynamically added phone fields
+        document.addEventListener('input', (e) => {
+            if (e.target.classList.contains('nok-contact')) {
+                this.formatPhoneInput(e.target);
+            }
+        });
+    }
+
+    formatPhoneInput(input) {
+        let value = input.value.replace(/\D/g, '');
+        
+        // Convert to +254 format if starts with 0
+        if (value.startsWith('0') && value.length > 1) {
+            value = '254' + value.substring(1);
         }
+        
+        // Limit to 12 digits (254 + 9 digits)
+        if (value.length > 12) {
+            value = value.substring(0, 12);
+        }
+        
+        // Format for display
+        if (value.length >= 3) {
+            input.value = '+' + value;
+        } else if (value.length > 0) {
+            input.value = value;
+        }
+        
+        // Format on blur
+        const originalBlur = input.onblur;
+        input.onblur = function(e) {
+            let val = e.target.value.replace(/\D/g, '');
+            if (val.startsWith('254') && val.length === 12) {
+                e.target.value = '+254' + val.substring(3, 6) + ' ' + val.substring(6, 9) + ' ' + val.substring(9);
+            }
+            if (originalBlur) originalBlur.call(this, e);
+        };
     }
 
     updateStepIndicator() {
@@ -200,15 +254,12 @@ class ProjectCeresForm {
         if (this.currentStep === 7 && this.formData.personal.fullName) {
             document.getElementById('consentName').textContent = this.formData.personal.fullName;
         }
-        
-        // Show step guide
-        this.showStepGuide();
     }
 
     showStepGuide() {
         const guides = {
             1: "Start by filling in your personal details. Make sure all required fields are completed.",
-            2: "Add your next of kin information. You can add multiple entries. If they're under 18, provide birth certificate number.",
+            2: "Add your next of kin information. You can add multiple entries.",
             3: "Take a clear profile photo. You can switch between front and rear cameras.",
             4: "Provide your farm location details. Use the GPS button to get your current coordinates.",
             5: "Tell us about your farming journey and future goals.",
@@ -216,8 +267,9 @@ class ProjectCeresForm {
             7: "Read the consent statement carefully and provide your digital signature."
         };
         
-        if (guides[this.currentStep]) {
-            this.showNotification(guides[this.currentStep], 'info');
+        if (guides[this.currentStep] && !this.shownNotifications.has(`guide-${this.currentStep}`)) {
+            this.showNotification(guides[this.currentStep], 'info', true);
+            this.shownNotifications.add(`guide-${this.currentStep}`);
         }
     }
 
@@ -233,6 +285,9 @@ class ProjectCeresForm {
                 if (this.currentStep !== 3 && this.cameraStream) {
                     this.stopCamera();
                 }
+                
+                // Show step guide
+                setTimeout(() => this.showStepGuide(), 500);
             }
         }
     }
@@ -251,6 +306,7 @@ class ProjectCeresForm {
         const requiredInputs = step.querySelectorAll('[required]');
         
         let isValid = true;
+        let errorMessages = [];
         
         requiredInputs.forEach(input => {
             if (!input.value.trim()) {
@@ -262,7 +318,7 @@ class ProjectCeresForm {
         });
         
         if (!isValid) {
-            this.showNotification('Please fill in all required fields marked with *', 'error');
+            this.showNotification('Please fill in all required fields marked with *', 'error', true);
             return false;
         }
         
@@ -271,7 +327,7 @@ class ProjectCeresForm {
             const email = document.getElementById('email');
             if (email.value && !this.isValidEmail(email.value)) {
                 email.style.borderColor = 'var(--danger)';
-                this.showNotification('Please enter a valid email address', 'error');
+                this.showNotification('Please enter a valid email address', 'error', true);
                 return false;
             }
         }
@@ -279,10 +335,10 @@ class ProjectCeresForm {
         // Additional validation for phone
         if (this.currentStep === 1) {
             const phone = document.getElementById('phone');
-            const phoneValue = phone.value.replace(/\s/g, '');
-            if (phoneValue && !this.isValidPhone(phoneValue)) {
+            const phoneValue = phone.value.replace(/\D/g, '');
+            if (!this.isValidPhone(phoneValue)) {
                 phone.style.borderColor = 'var(--danger)';
-                this.showNotification('Please enter a valid phone number (e.g., +254 712 345 678)', 'error');
+                this.showNotification('Please enter a valid Kenyan phone number (e.g., +254757432966 or 0757432966)', 'error', true);
                 return false;
             }
         }
@@ -290,13 +346,13 @@ class ProjectCeresForm {
         // Validation for signature
         if (this.currentStep === 7) {
             if (!this.signatureData) {
-                this.showNotification('Please provide your digital signature', 'error');
+                this.showNotification('Please provide your digital signature', 'error', true);
                 return false;
             }
             
             const consentCheckbox = document.getElementById('agreeConsent');
             if (!consentCheckbox.checked) {
-                this.showNotification('Please agree to the consent statement', 'error');
+                this.showNotification('Please agree to the consent statement', 'error', true);
                 return false;
             }
         }
@@ -311,16 +367,38 @@ class ProjectCeresForm {
 
     isValidPhone(phone) {
         // Accept +254 followed by 9 digits, or local format starting with 0
-        const re = /^(?:\+254|0)[17]\d{8}$/;
-        return re.test(phone.replace(/\s/g, ''));
+        // Remove all non-digits first
+        const cleaned = phone.replace(/\D/g, '');
+        
+        // Check if it's a valid Kenyan phone number
+        // Kenyan numbers: 254 followed by 9 digits (total 12), or 0 followed by 9 digits (total 10)
+        if (cleaned.startsWith('254') && cleaned.length === 12) {
+            return /^254[17]\d{8}$/.test(cleaned);
+        } else if (cleaned.startsWith('0') && cleaned.length === 10) {
+            return /^0[17]\d{8}$/.test(cleaned);
+        } else if (cleaned.length === 9) {
+            return /^[17]\d{8}$/.test(cleaned);
+        }
+        
+        return false;
     }
 
     saveCurrentStepData() {
         switch(this.currentStep) {
             case 1:
+                const phoneValue = document.getElementById('phone').value.replace(/\D/g, '');
+                let formattedPhone = phoneValue;
+                
+                // Format phone to +254XXXXXXXXX
+                if (phoneValue.startsWith('0') && phoneValue.length === 10) {
+                    formattedPhone = '254' + phoneValue.substring(1);
+                } else if (phoneValue.length === 9) {
+                    formattedPhone = '254' + phoneValue;
+                }
+                
                 this.formData.personal = {
                     fullName: document.getElementById('fullName').value,
-                    phone: document.getElementById('phone').value,
+                    phone: formattedPhone,
                     email: document.getElementById('email').value,
                     dob: document.getElementById('dob').value,
                     maritalStatus: document.getElementById('maritalStatus').value,
@@ -332,10 +410,20 @@ class ProjectCeresForm {
             case 2:
                 this.formData.nextOfKin = [];
                 document.querySelectorAll('.next-of-kin-entry').forEach(entry => {
+                    const phoneVal = entry.querySelector('.nok-contact').value.replace(/\D/g, '');
+                    let formattedNokPhone = phoneVal;
+                    
+                    // Format next of kin phone
+                    if (phoneVal.startsWith('0') && phoneVal.length === 10) {
+                        formattedNokPhone = '254' + phoneVal.substring(1);
+                    } else if (phoneVal.length === 9) {
+                        formattedNokPhone = '254' + phoneVal;
+                    }
+                    
                     const nok = {
                         name: entry.querySelector('.nok-name').value,
                         relationship: entry.querySelector('.nok-relationship').value,
-                        contact: entry.querySelector('.nok-contact').value,
+                        contact: formattedNokPhone,
                         birthCert: entry.querySelector('.nok-birth-cert').value,
                         age: entry.querySelector('.nok-age').value
                     };
@@ -391,9 +479,12 @@ class ProjectCeresForm {
                 this.formData.signature = this.signatureData;
                 break;
         }
+        
+        // Log data to console (for debugging)
+        console.log(`Step ${this.currentStep} data saved:`, this.formData);
     }
 
-    // Camera Functionality
+    // Camera Functionality (same as before, but with reduced notifications)
     async initializeCamera() {
         const video = document.getElementById('cameraView');
         const cameraSelect = document.getElementById('cameraSelect');
@@ -418,7 +509,7 @@ class ProjectCeresForm {
             captureBtn.disabled = false;
             switchBtn.disabled = false;
             retakeBtn.style.display = 'none';
-            this.showNotification('You can now retake your profile photo', 'info');
+            console.log('Photo retake ready');
         });
 
         // Camera selection change
@@ -459,7 +550,7 @@ class ProjectCeresForm {
             return cameras;
         } catch (error) {
             console.error('Error getting cameras:', error);
-            this.showNotification('Unable to access camera. Please check permissions.', 'error');
+            // Only show error if critical
             return [];
         }
     }
@@ -493,9 +584,11 @@ class ProjectCeresForm {
             } else {
                 this.livestockCameraStream = stream;
             }
+            
+            console.log('Camera started successfully');
         } catch (error) {
             console.error('Error starting camera:', error);
-            this.showNotification('Camera access denied. Please allow camera permissions.', 'error');
+            this.showNotification('Camera access denied. Please allow camera permissions.', 'error', true);
         }
     }
 
@@ -515,7 +608,7 @@ class ProjectCeresForm {
     async switchCamera(selectId) {
         const cameras = await this.getCameras(selectId);
         if (cameras.length < 2) {
-            this.showNotification('Only one camera available', 'warning');
+            console.log('Only one camera available');
             return;
         }
         
@@ -564,11 +657,11 @@ class ProjectCeresForm {
             // Stop camera to save battery
             this.stopCamera();
             
-            this.showNotification('Profile photo captured successfully! Camera turned off to save battery.', 'success');
+            this.showNotification('Profile photo captured successfully!', 'success', true);
         }, 'image/jpeg', 0.9);
     }
 
-    // Livestock Camera Functionality
+    // Livestock Camera Functionality (same as before)
     initializeLivestockCamera() {
         // Set up event listeners for livestock photo buttons
         document.addEventListener('click', (e) => {
@@ -661,7 +754,7 @@ class ProjectCeresForm {
             // Close modal
             this.closeLivestockCamera();
             
-            this.showNotification('Livestock photo captured successfully!', 'success');
+            this.showNotification('Livestock photo captured successfully!', 'success', true);
         }, 'image/jpeg', 0.9);
     }
 
@@ -684,7 +777,7 @@ class ProjectCeresForm {
             });
             
             this.updateLivestockPhotoPreview(entry, entryIndex);
-            this.showNotification(`${files.length} photo(s) uploaded successfully!`, 'success');
+            this.showNotification(`${files.length} photo(s) uploaded`, 'success', true);
         };
     }
 
@@ -725,7 +818,7 @@ class ProjectCeresForm {
             this.livestockPhotos[entryIndex].splice(photoIndex, 1);
             const entry = document.querySelectorAll('.livestock-entry')[entryIndex];
             this.updateLivestockPhotoPreview(entry, entryIndex);
-            this.showNotification('Photo removed', 'info');
+            console.log('Photo removed');
         }
     }
 
@@ -734,11 +827,11 @@ class ProjectCeresForm {
         if (this.livestockPhotos[entryIndex]) {
             this.livestockPhotos[entryIndex] = [];
             this.updateLivestockPhotoPreview(entry, entryIndex);
-            this.showNotification('All photos removed from this entry', 'info');
+            console.log('All photos removed from this entry');
         }
     }
 
-    // Signature Functionality
+    // Signature Functionality (same as before)
     initializeSignature() {
         const canvas = document.getElementById('signatureCanvas');
         const ctx = canvas.getContext('2d');
@@ -821,7 +914,7 @@ class ProjectCeresForm {
         this.signaturePoints = [];
         this.signatureData = null;
         document.getElementById('signaturePlaceholder').style.display = 'flex';
-        this.showNotification('Signature cleared', 'info');
+        console.log('Signature cleared');
     }
 
     undoSignature(canvas, ctx) {
@@ -843,7 +936,7 @@ class ProjectCeresForm {
                 this.signatureData = null;
             }
             
-            this.showNotification('Last stroke undone', 'info');
+            console.log('Last stroke undone');
         }
     }
 
@@ -851,11 +944,11 @@ class ProjectCeresForm {
         const canvas = document.getElementById('signatureCanvas');
         canvas.toBlob((blob) => {
             this.signatureData = blob;
-            this.showNotification('Signature saved', 'success');
+            console.log('Signature saved');
         }, 'image/png');
     }
 
-    // Location Functionality
+    // Location Functionality (same as before)
     initializeLocation() {
         document.getElementById('getCurrentLocation').addEventListener('click', () => {
             this.getCurrentLocation();
@@ -864,11 +957,11 @@ class ProjectCeresForm {
 
     getCurrentLocation() {
         if (!navigator.geolocation) {
-            this.showNotification('Geolocation is not supported by your browser', 'error');
+            this.showNotification('Geolocation is not supported by your browser', 'error', true);
             return;
         }
         
-        this.showNotification('Getting your location... Please ensure location services are enabled.', 'warning');
+        this.showNotification('Getting your location...', 'info', true);
         
         navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -878,7 +971,7 @@ class ProjectCeresForm {
                 document.getElementById('latitude').value = lat.toFixed(6);
                 document.getElementById('longitude').value = lng.toFixed(6);
                 
-                this.showNotification('Location obtained successfully!', 'success');
+                this.showNotification('Location obtained successfully!', 'success', true);
                 
                 // Reverse geocode to get address details
                 this.reverseGeocode(lat, lng);
@@ -887,7 +980,7 @@ class ProjectCeresForm {
                 let message = 'Unable to retrieve your location.';
                 switch(error.code) {
                     case error.PERMISSION_DENIED:
-                        message = 'Location permission denied. Please enable location services in your browser settings.';
+                        message = 'Location permission denied. Please enable location services.';
                         break;
                     case error.POSITION_UNAVAILABLE:
                         message = 'Location information is unavailable.';
@@ -896,7 +989,7 @@ class ProjectCeresForm {
                         message = 'Location request timed out.';
                         break;
                 }
-                this.showNotification(message, 'error');
+                this.showNotification(message, 'error', true);
             },
             {
                 enableHighAccuracy: true,
@@ -908,7 +1001,6 @@ class ProjectCeresForm {
 
     async reverseGeocode(lat, lng) {
         try {
-            // Using OpenStreetMap Nominatim API
             const response = await fetch(
                 `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
             );
@@ -948,13 +1040,13 @@ class ProjectCeresForm {
         }
     }
 
-    // Next of Kin Management
+    // Next of Kin Management (updated for phone handling)
     addNextOfKin() {
         const container = document.getElementById('nextOfKinContainer');
         const entryCount = container.children.length;
         
         if (entryCount >= 5) {
-            this.showNotification('Maximum 5 next of kin entries allowed', 'warning');
+            this.showNotification('Maximum 5 next of kin entries allowed', 'warning', true);
             return;
         }
         
@@ -972,7 +1064,9 @@ class ProjectCeresForm {
                 </div>
                 <div class="form-group">
                     <label>Next of Kin Contact *</label>
-                    <input type="tel" class="nok-contact" name="nok-contact[]" required placeholder="Phone number">
+                    <input type="tel" class="nok-contact" name="nok-contact[]" required placeholder="Phone number"
+                           pattern="^(\+254|0)[17]\d{8}$"
+                           title="Enter a valid Kenyan phone number">
                 </div>
                 <div class="form-group">
                     <label>Birth Certificate Number (If under 18)</label>
@@ -989,20 +1083,25 @@ class ProjectCeresForm {
         `;
         
         container.appendChild(newEntry);
-        this.showNotification('Next of kin entry added', 'success');
+        
+        // Set up phone formatting for new field
+        const phoneInput = newEntry.querySelector('.nok-contact');
+        this.formatPhoneInput(phoneInput);
+        
+        console.log('Next of kin entry added');
     }
 
     removeNextOfKin(button) {
         const container = document.getElementById('nextOfKinContainer');
         if (container.children.length > 1) {
             button.closest('.next-of-kin-entry').remove();
-            this.showNotification('Next of kin entry removed', 'success');
+            console.log('Next of kin entry removed');
         } else {
-            this.showNotification('At least one next of kin entry is required', 'warning');
+            this.showNotification('At least one next of kin entry is required', 'warning', true);
         }
     }
 
-    // Livestock Management
+    // Livestock Management (same as before)
     addLivestockEntry() {
         const container = document.getElementById('livestockContainer');
         const newEntry = document.createElement('div');
@@ -1071,7 +1170,7 @@ class ProjectCeresForm {
         `;
         
         container.appendChild(newEntry);
-        this.showNotification('Livestock entry added', 'success');
+        console.log('Livestock entry added');
     }
 
     removeLivestockEntry(button) {
@@ -1086,11 +1185,11 @@ class ProjectCeresForm {
             }
             
             entry.remove();
-            this.showNotification('Livestock entry removed', 'success');
+            console.log('Livestock entry removed');
         }
     }
 
-    // Profile View
+    // Profile View (same as before)
     toggleProfileView() {
         const formContainer = document.querySelector('.form-container');
         const profileView = document.getElementById('profileView');
@@ -1121,7 +1220,7 @@ class ProjectCeresForm {
                 </div>
                 <div class="profile-row">
                     <div class="profile-label">Phone Number:</div>
-                    <div class="profile-value">${this.formData.personal.phone || 'Not provided'}</div>
+                    <div class="profile-value">${this.formData.personal.phone ? '+254' + this.formData.personal.phone.substring(3) : 'Not provided'}</div>
                 </div>
                 <div class="profile-row">
                     <div class="profile-label">Email:</div>
@@ -1159,7 +1258,7 @@ class ProjectCeresForm {
                         <div class="profile-label">Next of Kin ${index + 1}:</div>
                         <div class="profile-value">
                             ${nok.name || ''} (${nok.relationship || ''})<br>
-                            <small>Contact: ${nok.contact || ''}</small>
+                            <small>Contact: ${nok.contact ? '+254' + nok.contact.substring(3) : ''}</small>
                             ${extraInfo}
                         </div>
                     </div>
@@ -1253,15 +1352,11 @@ class ProjectCeresForm {
         profileContent.innerHTML = html;
     }
 
-    // Cloudinary Upload Function
+    // Cloudinary Upload Function (same as before)
     async uploadToCloudinary(file, folder = 'muthegi-group') {
-        // Cloudinary configuration
         const cloudName = 'dpymwa41m';
         const apiKey = '126267173967732';
-        
-        // For direct uploads, you need an upload preset
-        // Create one in Cloudinary Dashboard: Settings > Upload > Upload presets
-        const uploadPreset = 'muthegi_preset'; // Change this to your actual upload preset
+        const uploadPreset = 'muthegi_preset';
         
         const formData = new FormData();
         formData.append('file', file);
@@ -1270,7 +1365,7 @@ class ProjectCeresForm {
         formData.append('api_key', apiKey);
         
         try {
-            this.showNotification(`Uploading ${folder}...`, 'info');
+            console.log(`Uploading to ${folder}...`);
             
             const response = await fetch(
                 `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
@@ -1302,7 +1397,7 @@ class ProjectCeresForm {
         }
     }
 
-    // Firebase Save Function
+    // Firebase Save Function (same as before)
     async saveToFirebase(data) {
         if (!this.firebaseInitialized || !this.db) {
             throw new Error('Firebase not initialized');
@@ -1311,7 +1406,6 @@ class ProjectCeresForm {
         try {
             const { collection, addDoc } = window.firebaseModules;
             
-            // Prepare data for Firebase (remove blobs, keep URLs)
             const firebaseData = {
                 personal: data.personal,
                 nextOfKin: data.nextOfKin,
@@ -1336,7 +1430,6 @@ class ProjectCeresForm {
                 updatedAt: new Date().toISOString()
             };
             
-            // Save to Firestore
             const docRef = await addDoc(collection(this.db, 'muthegi-group-members'), firebaseData);
             
             return {
@@ -1357,7 +1450,6 @@ class ProjectCeresForm {
             const key = `muthegi_member_${timestamp}`;
             localStorage.setItem(key, JSON.stringify(data));
             
-            // Keep track of saved forms
             const savedForms = JSON.parse(localStorage.getItem('muthegi_saved_forms') || '[]');
             savedForms.push({
                 key: key,
@@ -1381,16 +1473,16 @@ class ProjectCeresForm {
         }
     }
 
-    // Form Submission
+    // Form Submission (with reduced notifications)
     async submitForm() {
-        this.showNotification('Starting submission process...', 'warning');
+        this.showNotification('Starting submission process...', 'warning', true);
         
         try {
             // Validate all steps
             for (let i = 1; i <= this.totalSteps; i++) {
                 this.currentStep = i;
                 if (!this.validateCurrentStep()) {
-                    this.showNotification('Please complete all required fields', 'error');
+                    this.showNotification('Please complete all required fields', 'error', true);
                     this.updateStepIndicator();
                     return;
                 }
@@ -1407,13 +1499,13 @@ class ProjectCeresForm {
             // Upload profile photo if exists
             let profilePhotoUrl = null;
             if (this.profilePhotoData) {
-                this.showNotification('Uploading profile photo...', 'info');
+                console.log('Uploading profile photo...');
                 const uploadResult = await this.uploadToCloudinary(this.profilePhotoData, 'muthegi-group/profiles');
                 if (uploadResult.success) {
                     profilePhotoUrl = uploadResult.url;
-                    this.showNotification('Profile photo uploaded successfully!', 'success');
+                    console.log('Profile photo uploaded successfully!');
                 } else {
-                    this.showNotification('Failed to upload profile photo: ' + uploadResult.error, 'error');
+                    console.error('Failed to upload profile photo:', uploadResult.error);
                 }
             }
             
@@ -1423,16 +1515,16 @@ class ProjectCeresForm {
                 const photos = this.livestockPhotos[i];
                 if (photos && photos.length > 0) {
                     for (let j = 0; j < photos.length; j++) {
-                        this.showNotification(`Uploading livestock photo ${j + 1} of ${photos.length}...`, 'info');
+                        console.log(`Uploading livestock photo ${j + 1} of ${photos.length}...`);
                         const uploadResult = await this.uploadToCloudinary(photos[j], 'muthegi-group/livestock');
                         if (uploadResult.success) {
                             livestockPhotoUrls.push({
                                 livestockIndex: i,
                                 url: uploadResult.url
                             });
-                            this.showNotification(`Livestock photo ${j + 1} uploaded`, 'success');
+                            console.log(`Livestock photo ${j + 1} uploaded`);
                         } else {
-                            this.showNotification(`Failed to upload livestock photo ${j + 1}: ${uploadResult.error}`, 'error');
+                            console.error(`Failed to upload livestock photo ${j + 1}:`, uploadResult.error);
                         }
                     }
                 }
@@ -1441,11 +1533,11 @@ class ProjectCeresForm {
             // Upload signature if exists
             let signatureUrl = null;
             if (this.signatureData) {
-                this.showNotification('Uploading signature...', 'info');
+                console.log('Uploading signature...');
                 const uploadResult = await this.uploadToCloudinary(this.signatureData, 'muthegi-group/signatures');
                 if (uploadResult.success) {
                     signatureUrl = uploadResult.url;
-                    this.showNotification('Signature uploaded successfully!', 'success');
+                    console.log('Signature uploaded successfully!');
                 }
             }
             
@@ -1465,11 +1557,11 @@ class ProjectCeresForm {
             let firebaseResult = null;
             if (this.firebaseInitialized) {
                 try {
-                    this.showNotification('Saving data to database...', 'info');
+                    console.log('Saving data to database...');
                     firebaseResult = await this.saveToFirebase(memberData);
-                    this.showNotification('Data saved to database successfully!', 'success');
+                    this.showNotification('Data submitted successfully!', 'success', true);
                 } catch (firebaseError) {
-                    this.showNotification(`Firebase save failed: ${firebaseError.message}. Saving locally as backup.`, 'error');
+                    console.error('Firebase save failed:', firebaseError);
                     firebaseResult = { success: false, error: firebaseError.message };
                 }
             }
@@ -1477,27 +1569,26 @@ class ProjectCeresForm {
             // Save locally as backup
             const localResult = this.saveToLocalStorage(memberData);
             if (localResult.success) {
-                this.showNotification('Data backed up locally', 'info');
+                console.log('Data backed up locally');
             }
             
-            // Show final success message
+            // Show final message
             if (firebaseResult && firebaseResult.success) {
-                this.showNotification('Form submitted successfully! Data saved to cloud database.', 'success');
+                this.showNotification('Form submitted successfully! Thank you.', 'success', true);
             } else {
-                this.showNotification('Form submitted! Data saved locally. Please check internet connection for cloud sync.', 'warning');
+                this.showNotification('Form submitted! Data saved locally.', 'warning', true);
             }
             
             // Reset form after 3 seconds
             setTimeout(() => {
                 this.resetForm();
-                this.showNotification('Form reset for next entry', 'info');
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Data';
             }, 3000);
             
         } catch (error) {
             console.error('Submission error:', error);
-            this.showNotification(`Submission failed: ${error.message}`, 'error');
+            this.showNotification(`Submission failed: ${error.message}`, 'error', true);
             
             // Re-enable submit button
             const submitBtn = document.getElementById('submitBtn');
@@ -1523,6 +1614,7 @@ class ProjectCeresForm {
         this.livestockPhotos = [];
         this.signatureData = null;
         this.signaturePoints = [];
+        this.shownNotifications.clear();
         
         // Reset form fields
         document.getElementById('memberForm').reset();
@@ -1562,7 +1654,9 @@ class ProjectCeresForm {
                     </div>
                     <div class="form-group">
                         <label>Next of Kin Contact *</label>
-                        <input type="tel" class="nok-contact" name="nok-contact[]" required placeholder="Phone number">
+                        <input type="tel" class="nok-contact" name="nok-contact[]" required placeholder="Phone number"
+                               pattern="^(\+254|0)[17]\d{8}$"
+                               title="Enter a valid Kenyan phone number">
                     </div>
                     <div class="form-group">
                         <label>Birth Certificate Number (If under 18)</label>
@@ -1651,10 +1745,28 @@ class ProjectCeresForm {
         // Close any open modal
         document.getElementById('livestockCameraModal').style.display = 'none';
         this.stopLivestockCamera();
+        
+        // Re-setup phone fields
+        this.setupDynamicPhoneFields();
     }
 
-    // Notification System
-    showNotification(message, type = 'info') {
+    // Notification System with control
+    showNotification(message, type = 'info', forceShow = false) {
+        // Only show important notifications
+        if (!forceShow && type === 'info') {
+            console.log(`Info: ${message}`);
+            return;
+        }
+        
+        // Limit error notifications
+        if (type === 'error' && !forceShow) {
+            const errorKey = `error-${message.substring(0, 50)}`;
+            if (this.shownNotifications.has(errorKey)) {
+                return;
+            }
+            this.shownNotifications.add(errorKey);
+        }
+        
         const container = document.getElementById('notificationContainer');
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
@@ -1673,12 +1785,13 @@ class ProjectCeresForm {
         
         container.appendChild(notification);
         
-        // Remove notification after 5 seconds
+        // Remove notification after appropriate time
+        const duration = type === 'error' ? 8000 : 5000;
         setTimeout(() => {
             notification.style.opacity = '0';
             notification.style.transform = 'translateX(100%)';
             setTimeout(() => notification.remove(), 300);
-        }, 5000);
+        }, duration);
     }
 }
 
