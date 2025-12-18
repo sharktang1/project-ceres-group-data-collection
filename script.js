@@ -78,10 +78,12 @@ class ProjectCeresForm {
         this.initializeLocation();
         this.updateStepIndicator();
         
-        // Set up form submission
+        // Set up form submission - using custom validation
         document.getElementById('memberForm').addEventListener('submit', (e) => {
             e.preventDefault();
-            this.submitForm();
+            if (this.validateCurrentStep(true)) {
+                this.submitForm();
+            }
         });
         
         // Show initial guide (only once)
@@ -109,7 +111,7 @@ class ProjectCeresForm {
             // Firebase configuration
             const firebaseConfig = {
                 apiKey: "AIzaSyBQAXb4Jv27wld9LAypBpSqqF_7WFhPp4A",
-                authDomain: "groupsdb1.firebaseapp.com",
+                authDomain: "groupsdb1.firebasestorage.app",
                 projectId: "groupsdb1",
                 storageBucket: "groupsdb1.firebasestorage.app",
                 messagingSenderId: "233794413556",
@@ -124,7 +126,6 @@ class ProjectCeresForm {
             this.firebaseInitialized = true;
             
             console.log('Firebase initialized successfully');
-            // Don't show notification for Firebase initialization
             
         } catch (error) {
             console.error('Firebase initialization error:', error);
@@ -143,7 +144,7 @@ class ProjectCeresForm {
         const minDate = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
         document.getElementById('dob').min = minDate.toISOString().split('T')[0];
         
-        // Phone number handling - SIMPLIFIED
+        // Phone number handling - SIMPLIFIED - NO PATTERN VALIDATION
         document.getElementById('phone').addEventListener('input', (e) => {
             let value = e.target.value.replace(/\D/g, ''); // Remove all non-digits
             
@@ -152,11 +153,7 @@ class ProjectCeresForm {
                 value = '254' + value.substring(1);
             }
             
-            // Limit to 12 digits (254 + 9 digits)
-            if (value.length > 12) {
-                value = value.substring(0, 12);
-            }
-            
+            // No length limit - let user type freely
             // Format for display (optional)
             if (value.length >= 3) {
                 e.target.value = '+' + value;
@@ -168,8 +165,9 @@ class ProjectCeresForm {
         // Add blur event to format on lose focus
         document.getElementById('phone').addEventListener('blur', (e) => {
             let value = e.target.value.replace(/\D/g, '');
-            if (value.startsWith('254') && value.length === 12) {
-                e.target.value = '+254' + value.substring(3, 6) + ' ' + value.substring(6, 9) + ' ' + value.substring(9);
+            if (value.startsWith('254') && value.length >= 12) {
+                // Keep it simple, just show +254 prefix
+                e.target.value = '+254' + value.substring(3);
             }
         });
         
@@ -201,12 +199,7 @@ class ProjectCeresForm {
             value = '254' + value.substring(1);
         }
         
-        // Limit to 12 digits (254 + 9 digits)
-        if (value.length > 12) {
-            value = value.substring(0, 12);
-        }
-        
-        // Format for display
+        // No length limit
         if (value.length >= 3) {
             input.value = '+' + value;
         } else if (value.length > 0) {
@@ -217,8 +210,8 @@ class ProjectCeresForm {
         const originalBlur = input.onblur;
         input.onblur = function(e) {
             let val = e.target.value.replace(/\D/g, '');
-            if (val.startsWith('254') && val.length === 12) {
-                e.target.value = '+254' + val.substring(3, 6) + ' ' + val.substring(6, 9) + ' ' + val.substring(9);
+            if (val.startsWith('254') && val.length >= 12) {
+                e.target.value = '+254' + val.substring(3);
             }
             if (originalBlur) originalBlur.call(this, e);
         };
@@ -300,64 +293,113 @@ class ProjectCeresForm {
         }
     }
 
-    validateCurrentStep() {
+    validateCurrentStep(submitValidation = false) {
         const stepId = `step${this.currentStep}`;
         const step = document.getElementById(stepId);
         const requiredInputs = step.querySelectorAll('[required]');
         
         let isValid = true;
-        let errorMessages = [];
         
+        // Clear all validation errors first
+        step.querySelectorAll('.validation-error').forEach(el => {
+            el.classList.remove('validation-error');
+        });
+        step.querySelectorAll('.validation-error-message').forEach(el => {
+            el.classList.remove('show');
+        });
+        
+        // Validate required fields
         requiredInputs.forEach(input => {
-            if (!input.value.trim()) {
-                input.style.borderColor = 'var(--danger)';
-                isValid = false;
+            if (input.type === 'checkbox') {
+                if (!input.checked) {
+                    isValid = false;
+                    this.showValidationError(input, 'This agreement is required');
+                }
+            } else if (input.type === 'tel') {
+                const value = input.value.replace(/\D/g, '');
+                if (!value || !this.isValidPhone(value)) {
+                    isValid = false;
+                    this.showValidationError(input, 'Please enter a valid Kenyan phone number');
+                }
+            } else if (input.type === 'date') {
+                if (!input.value) {
+                    isValid = false;
+                    this.showValidationError(input, 'Please enter your date of birth');
+                } else {
+                    const dateValue = new Date(input.value);
+                    const minDate = new Date(input.min);
+                    const maxDate = new Date(input.max);
+                    
+                    if (dateValue < minDate || dateValue > maxDate) {
+                        isValid = false;
+                        this.showValidationError(input, 'Date must be between 1925 and 2007');
+                    }
+                }
+            } else if (input.type === 'email') {
+                if (input.value && !this.isValidEmail(input.value)) {
+                    isValid = false;
+                    this.showValidationError(input, 'Please enter a valid email address');
+                } else if (!input.value && submitValidation && this.currentStep === 1) {
+                    // Email is optional, but for submission we want to encourage it
+                    this.showNotification('Email is recommended for better communication', 'warning', true);
+                }
             } else {
-                input.style.borderColor = '';
+                if (!input.value.trim()) {
+                    isValid = false;
+                    const label = input.previousElementSibling?.textContent || 'This field';
+                    this.showValidationError(input, `${label} is required`);
+                }
             }
         });
         
+        // Special validation for signature
+        if (this.currentStep === 7) {
+            if (!this.signatureData) {
+                isValid = false;
+                const signatureError = document.getElementById('signatureError');
+                if (signatureError) {
+                    signatureError.classList.add('show');
+                }
+            } else {
+                const signatureError = document.getElementById('signatureError');
+                if (signatureError) {
+                    signatureError.classList.remove('show');
+                }
+            }
+            
+            // Validate consent checkbox
+            const consentCheckbox = document.getElementById('agreeConsent');
+            if (!consentCheckbox.checked) {
+                isValid = false;
+                this.showValidationError(consentCheckbox, 'Please agree to the consent statement');
+            }
+        }
+        
         if (!isValid) {
-            this.showNotification('Please fill in all required fields marked with *', 'error', true);
+            this.showNotification('Please fill in all required fields correctly', 'error', true);
+            
+            // Scroll to first error
+            const firstError = step.querySelector('.validation-error');
+            if (firstError) {
+                setTimeout(() => {
+                    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    firstError.focus();
+                }, 100);
+            }
+            
             return false;
         }
         
-        // Additional validation for email
-        if (this.currentStep === 1) {
-            const email = document.getElementById('email');
-            if (email.value && !this.isValidEmail(email.value)) {
-                email.style.borderColor = 'var(--danger)';
-                this.showNotification('Please enter a valid email address', 'error', true);
-                return false;
-            }
-        }
-        
-        // Additional validation for phone
-        if (this.currentStep === 1) {
-            const phone = document.getElementById('phone');
-            const phoneValue = phone.value.replace(/\D/g, '');
-            if (!this.isValidPhone(phoneValue)) {
-                phone.style.borderColor = 'var(--danger)';
-                this.showNotification('Please enter a valid Kenyan phone number (e.g., +254757432966 or 0757432966)', 'error', true);
-                return false;
-            }
-        }
-        
-        // Validation for signature
-        if (this.currentStep === 7) {
-            if (!this.signatureData) {
-                this.showNotification('Please provide your digital signature', 'error', true);
-                return false;
-            }
-            
-            const consentCheckbox = document.getElementById('agreeConsent');
-            if (!consentCheckbox.checked) {
-                this.showNotification('Please agree to the consent statement', 'error', true);
-                return false;
-            }
-        }
-        
         return true;
+    }
+
+    showValidationError(input, message) {
+        input.classList.add('validation-error');
+        const errorDiv = input.nextElementSibling;
+        if (errorDiv && errorDiv.classList.contains('validation-error-message')) {
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
+        }
     }
 
     isValidEmail(email) {
@@ -366,12 +408,11 @@ class ProjectCeresForm {
     }
 
     isValidPhone(phone) {
-        // Accept +254 followed by 9 digits, or local format starting with 0
-        // Remove all non-digits first
+        // Remove all non-digits
         const cleaned = phone.replace(/\D/g, '');
         
         // Check if it's a valid Kenyan phone number
-        // Kenyan numbers: 254 followed by 9 digits (total 12), or 0 followed by 9 digits (total 10)
+        // Accept: 254 followed by 9 digits (12 total), or 0 followed by 9 digits (10 total)
         if (cleaned.startsWith('254') && cleaned.length === 12) {
             return /^254[17]\d{8}$/.test(cleaned);
         } else if (cleaned.startsWith('0') && cleaned.length === 10) {
@@ -389,7 +430,7 @@ class ProjectCeresForm {
                 const phoneValue = document.getElementById('phone').value.replace(/\D/g, '');
                 let formattedPhone = phoneValue;
                 
-                // Format phone to +254XXXXXXXXX
+                // Format phone to 254XXXXXXXXX
                 if (phoneValue.startsWith('0') && phoneValue.length === 10) {
                     formattedPhone = '254' + phoneValue.substring(1);
                 } else if (phoneValue.length === 9) {
@@ -484,7 +525,7 @@ class ProjectCeresForm {
         console.log(`Step ${this.currentStep} data saved:`, this.formData);
     }
 
-    // Camera Functionality (same as before, but with reduced notifications)
+    // Camera Functionality
     async initializeCamera() {
         const video = document.getElementById('cameraView');
         const cameraSelect = document.getElementById('cameraSelect');
@@ -550,7 +591,6 @@ class ProjectCeresForm {
             return cameras;
         } catch (error) {
             console.error('Error getting cameras:', error);
-            // Only show error if critical
             return [];
         }
     }
@@ -661,7 +701,7 @@ class ProjectCeresForm {
         }, 'image/jpeg', 0.9);
     }
 
-    // Livestock Camera Functionality (same as before)
+    // Livestock Camera Functionality
     initializeLivestockCamera() {
         // Set up event listeners for livestock photo buttons
         document.addEventListener('click', (e) => {
@@ -831,7 +871,7 @@ class ProjectCeresForm {
         }
     }
 
-    // Signature Functionality (same as before)
+    // Signature Functionality with Mouse/Touchpad Support
     initializeSignature() {
         const canvas = document.getElementById('signatureCanvas');
         const ctx = canvas.getContext('2d');
@@ -846,23 +886,116 @@ class ProjectCeresForm {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         
-        // Event listeners for drawing
-        canvas.addEventListener('mousedown', (e) => this.startDrawing(e, canvas, ctx));
-        canvas.addEventListener('mousemove', (e) => this.draw(e, canvas, ctx));
-        canvas.addEventListener('mouseup', () => this.stopDrawing());
-        canvas.addEventListener('mouseout', () => this.stopDrawing());
+        // Get canvas position
+        const getCanvasPosition = (e) => {
+            const rect = canvas.getBoundingClientRect();
+            let x, y;
+            
+            if (e.type.includes('touch')) {
+                // For touch events
+                x = e.touches[0].clientX - rect.left;
+                y = e.touches[0].clientY - rect.top;
+            } else if (e.type === 'pointer') {
+                // For pointer events (works with mouse and touchpad)
+                x = e.clientX - rect.left;
+                y = e.clientY - rect.top;
+            } else {
+                // For mouse events
+                x = e.clientX - rect.left;
+                y = e.clientY - rect.top;
+            }
+            
+            return { x, y };
+        };
+        
+        // Start drawing
+        const startDrawing = (e) => {
+            this.isDrawing = true;
+            const { x, y } = getCanvasPosition(e);
+            
+            this.signaturePoints = [[x, y]];
+            document.getElementById('signaturePlaceholder').style.display = 'none';
+            
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        };
+        
+        // Draw
+        const draw = (e) => {
+            if (!this.isDrawing) return;
+            
+            const { x, y } = getCanvasPosition(e);
+            this.signaturePoints.push([x, y]);
+            
+            ctx.lineTo(x, y);
+            ctx.stroke();
+        };
+        
+        // Stop drawing
+        const stopDrawing = () => {
+            if (this.isDrawing) {
+                this.isDrawing = false;
+                this.saveSignature();
+            }
+        };
+        
+        // Mouse events
+        canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            startDrawing(e);
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            e.preventDefault();
+            draw(e);
+        });
+        
+        canvas.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            stopDrawing();
+        });
+        
+        canvas.addEventListener('mouseout', (e) => {
+            e.preventDefault();
+            stopDrawing();
+        });
         
         // Touch events for mobile
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            this.startDrawing(e, canvas, ctx);
+            startDrawing(e);
         });
+        
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
-            this.draw(e, canvas, ctx);
+            draw(e);
         });
-        canvas.addEventListener('touchend', () => {
-            this.stopDrawing();
+        
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            stopDrawing();
+        });
+        
+        // Pointer events for better touchpad/mouse support
+        canvas.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            startDrawing(e);
+        });
+        
+        canvas.addEventListener('pointermove', (e) => {
+            if (!this.isDrawing) return;
+            e.preventDefault();
+            draw(e);
+        });
+        
+        canvas.addEventListener('pointerup', (e) => {
+            e.preventDefault();
+            stopDrawing();
+        });
+        
+        canvas.addEventListener('pointerout', (e) => {
+            e.preventDefault();
+            stopDrawing();
         });
         
         // Clear signature button
@@ -874,39 +1007,6 @@ class ProjectCeresForm {
         document.getElementById('undoSignature').addEventListener('click', () => {
             this.undoSignature(canvas, ctx);
         });
-    }
-
-    startDrawing(e, canvas, ctx) {
-        this.isDrawing = true;
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX || e.touches[0].clientX) - rect.left;
-        const y = (e.clientY || e.touches[0].clientY) - rect.top;
-        
-        this.signaturePoints = [[x, y]];
-        document.getElementById('signaturePlaceholder').style.display = 'none';
-        
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-    }
-
-    draw(e, canvas, ctx) {
-        if (!this.isDrawing) return;
-        
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX || e.touches[0].clientX) - rect.left;
-        const y = (e.clientY || e.touches[0].clientY) - rect.top;
-        
-        this.signaturePoints.push([x, y]);
-        
-        ctx.lineTo(x, y);
-        ctx.stroke();
-    }
-
-    stopDrawing() {
-        if (this.isDrawing) {
-            this.isDrawing = false;
-            this.saveSignature();
-        }
     }
 
     clearSignature(canvas, ctx) {
@@ -948,7 +1048,7 @@ class ProjectCeresForm {
         }, 'image/png');
     }
 
-    // Location Functionality (same as before)
+    // Location Functionality
     initializeLocation() {
         document.getElementById('getCurrentLocation').addEventListener('click', () => {
             this.getCurrentLocation();
@@ -1040,7 +1140,7 @@ class ProjectCeresForm {
         }
     }
 
-    // Next of Kin Management (updated for phone handling)
+    // Next of Kin Management
     addNextOfKin() {
         const container = document.getElementById('nextOfKinContainer');
         const entryCount = container.children.length;
@@ -1057,16 +1157,18 @@ class ProjectCeresForm {
                 <div class="form-group">
                     <label>Next of Kin Name *</label>
                     <input type="text" class="nok-name" name="nok-name[]" required placeholder="Full name">
+                    <div class="validation-error-message nok-name-error">Please enter next of kin name</div>
                 </div>
                 <div class="form-group">
                     <label>Relationship *</label>
                     <input type="text" class="nok-relationship" name="nok-relationship[]" required placeholder="e.g., Spouse, Parent">
+                    <div class="validation-error-message nok-relationship-error">Please enter relationship</div>
                 </div>
                 <div class="form-group">
                     <label>Next of Kin Contact *</label>
-                    <input type="tel" class="nok-contact" name="nok-contact[]" required placeholder="Phone number"
-                           pattern="^(\+254|0)[17]\d{8}$"
-                           title="Enter a valid Kenyan phone number">
+                    <input type="tel" class="nok-contact" name="nok-contact[]" required 
+                           placeholder="Phone number">
+                    <div class="validation-error-message nok-contact-error">Please enter a valid phone number</div>
                 </div>
                 <div class="form-group">
                     <label>Birth Certificate Number (If under 18)</label>
@@ -1101,7 +1203,7 @@ class ProjectCeresForm {
         }
     }
 
-    // Livestock Management (same as before)
+    // Livestock Management
     addLivestockEntry() {
         const container = document.getElementById('livestockContainer');
         const newEntry = document.createElement('div');
@@ -1119,6 +1221,7 @@ class ProjectCeresForm {
                         <option value="Pig">Pig</option>
                         <option value="Other">Other</option>
                     </select>
+                    <div class="validation-error-message livestock-type-error">Please select livestock type</div>
                 </div>
                 <div class="form-group">
                     <label>Produce</label>
@@ -1135,6 +1238,7 @@ class ProjectCeresForm {
                 <div class="form-group">
                     <label>Number of Animals *</label>
                     <input type="number" class="livestock-count" name="livestock-count[]" min="1" required placeholder="0">
+                    <div class="validation-error-message livestock-count-error">Please enter number of animals (minimum 1)</div>
                 </div>
             </div>
             <div class="form-group">
@@ -1189,7 +1293,7 @@ class ProjectCeresForm {
         }
     }
 
-    // Profile View (same as before)
+    // Profile View
     toggleProfileView() {
         const formContainer = document.querySelector('.form-container');
         const profileView = document.getElementById('profileView');
@@ -1352,11 +1456,14 @@ class ProjectCeresForm {
         profileContent.innerHTML = html;
     }
 
-    // Cloudinary Upload Function (same as before)
+    // Cloudinary Upload Function
     async uploadToCloudinary(file, folder = 'muthegi-group') {
+        // Cloudinary configuration
         const cloudName = 'dpymwa41m';
         const apiKey = '126267173967732';
-        const uploadPreset = 'muthegi_preset';
+        
+        // For direct uploads, you need an upload preset
+        const uploadPreset = 'muthegi_preset'; // Change this to your actual upload preset
         
         const formData = new FormData();
         formData.append('file', file);
@@ -1397,7 +1504,7 @@ class ProjectCeresForm {
         }
     }
 
-    // Firebase Save Function (same as before)
+    // Firebase Save Function
     async saveToFirebase(data) {
         if (!this.firebaseInitialized || !this.db) {
             throw new Error('Firebase not initialized');
@@ -1478,10 +1585,10 @@ class ProjectCeresForm {
         this.showNotification('Starting submission process...', 'warning', true);
         
         try {
-            // Validate all steps
+            // Validate all steps for final submission
             for (let i = 1; i <= this.totalSteps; i++) {
                 this.currentStep = i;
-                if (!this.validateCurrentStep()) {
+                if (!this.validateCurrentStep(true)) {
                     this.showNotification('Please complete all required fields', 'error', true);
                     this.updateStepIndicator();
                     return;
@@ -1647,16 +1754,18 @@ class ProjectCeresForm {
                     <div class="form-group">
                         <label>Next of Kin Name *</label>
                         <input type="text" class="nok-name" name="nok-name[]" required placeholder="Full name">
+                        <div class="validation-error-message nok-name-error">Please enter next of kin name</div>
                     </div>
                     <div class="form-group">
                         <label>Relationship *</label>
                         <input type="text" class="nok-relationship" name="nok-relationship[]" required placeholder="e.g., Spouse, Parent">
+                        <div class="validation-error-message nok-relationship-error">Please enter relationship</div>
                     </div>
                     <div class="form-group">
                         <label>Next of Kin Contact *</label>
-                        <input type="tel" class="nok-contact" name="nok-contact[]" required placeholder="Phone number"
-                               pattern="^(\+254|0)[17]\d{8}$"
-                               title="Enter a valid Kenyan phone number">
+                        <input type="tel" class="nok-contact" name="nok-contact[]" required 
+                               placeholder="Phone number">
+                        <div class="validation-error-message nok-contact-error">Please enter a valid phone number</div>
                     </div>
                     <div class="form-group">
                         <label>Birth Certificate Number (If under 18)</label>
@@ -1687,6 +1796,7 @@ class ProjectCeresForm {
                             <option value="Pig">Pig</option>
                             <option value="Other">Other</option>
                         </select>
+                        <div class="validation-error-message livestock-type-error">Please select livestock type</div>
                     </div>
                     <div class="form-group">
                         <label>Produce</label>
@@ -1703,6 +1813,7 @@ class ProjectCeresForm {
                     <div class="form-group">
                         <label>Number of Animals *</label>
                         <input type="number" class="livestock-count" name="livestock-count[]" min="1" required placeholder="0">
+                        <div class="validation-error-message livestock-count-error">Please enter number of animals (minimum 1)</div>
                     </div>
                 </div>
                 <div class="form-group">
