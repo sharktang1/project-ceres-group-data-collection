@@ -985,6 +985,25 @@ body {
         width: 80px;
         height: 80px;
     }
+
+    /* Phone input specific styling */
+input[type="tel"] {
+    letter-spacing: 0.5px;
+}
+
+/* Reduce notification frequency */
+.notification {
+    /* Keep existing styles */
+}
+
+/* Hide some notifications by default */
+.notification.info {
+    display: none; /* Hide info notifications */
+}
+
+.notification.info:first-of-type {
+    display: flex; /* Show only the first info notification */
+}
     
     .signature-controls {
         flex-direction: column;
