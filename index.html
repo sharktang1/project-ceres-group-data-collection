@@ -72,8 +72,11 @@
                         </div>
                         <div class="form-group">
                             <label for="phone">Phone Number *</label>
-                            <input type="tel" id="phone" name="phone" required placeholder="+254 XXX XXX XXX">
-                            <small class="help-text">Format: +254 7XX XXX XXX</small>
+                            <input type="tel" id="phone" name="phone" required 
+                                   placeholder="+254757432966 or 0757432966"
+                                   pattern="^(\+254|0)[17]\d{8}$"
+                                   title="Enter a valid Kenyan phone number (e.g., +254757432966 or 0757432966)">
+                            <small class="help-text">Format: +2547XXXXXXXX or 07XXXXXXXX (10 digits total)</small>
                         </div>
                         <div class="form-group">
                             <label for="email">Email Address</label>
@@ -130,7 +133,10 @@
                                 </div>
                                 <div class="form-group">
                                     <label>Next of Kin Contact *</label>
-                                    <input type="tel" class="nok-contact" name="nok-contact[]" required placeholder="Phone number">
+                                    <input type="tel" class="nok-contact" name="nok-contact[]" required 
+                                       placeholder="Phone number"
+                                       pattern="^(\+254|0)[17]\d{8}$"
+                                       title="Enter a valid Kenyan phone number">
                                 </div>
                                 <div class="form-group">
                                     <label>Birth Certificate Number (If under 18)</label>
