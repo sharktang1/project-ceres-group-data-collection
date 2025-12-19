@@ -112,10 +112,10 @@
                         <div class="form-group">
                             <label for="phone">Phone Number *</label>
                             <input type="tel" id="phone" name="phone" required 
-                                   placeholder="e.g., 0757432966 or +254757432966"
-                                   data-pattern="^(\\+254|0)[17]\\d{8}$">
-                            <div class="validation-error-message" id="phoneError">Please enter a valid Kenyan phone number (e.g., 0757432966 or +254757432966)</div>
-                            <small class="help-text">Format: 07XXXXXXXX or +2547XXXXXXXX (10 digits total)</small>
+                                   placeholder="e.g., +254720547335 or 0720547335"
+                                   inputmode="tel">
+                            <div class="validation-error-message" id="phoneError">Please enter a valid Kenyan phone number (e.g., +254720547335 or 0720547335)</div>
+                            <small class="help-text">Format: +254XXXXXXXXX or 07XXXXXXXX (10 digits total)</small>
                         </div>
                         <div class="form-group">
                             <label for="email">Email Address</label>
@@ -180,7 +180,7 @@
                                     <label>Next of Kin Contact *</label>
                                     <input type="tel" class="nok-contact" name="nok-contact[]" required 
                                            placeholder="Phone number"
-                                           data-pattern="^(\\+254|0)[17]\\d{8}$">
+                                           inputmode="tel">
                                     <div class="validation-error-message nok-contact-error">Please enter a valid phone number</div>
                                 </div>
                                 <div class="form-group">
@@ -596,18 +596,25 @@
         }
         
         function validatePhoneInput(input) {
-            const value = input.value.replace(/\s/g, '');
-            const pattern = input.getAttribute('data-pattern');
+            const value = input.value.trim();
             
             if (!value) {
                 showValidationError(input, 'Please enter a phone number');
                 return false;
             }
             
-            if (pattern) {
-                const regex = new RegExp(pattern);
-                if (!regex.test(value)) {
-                    showValidationError(input, 'Please enter a valid Kenyan phone number (e.g., 0757432966 or +254757432966)');
+            // Use the ProjectCeresForm validation if available
+            if (window.projectCeresForm) {
+                if (!projectCeresForm.isValidPhone(value)) {
+                    showValidationError(input, 'Please enter a valid Kenyan phone number (e.g., +254720547335 or 0720547335)');
+                    return false;
+                }
+            } else {
+                // Fallback validation
+                const kenyanRegex = /^(?:\+?254|0)?[17]\d{8}$/;
+                const cleaned = value.replace(/\D/g, '');
+                if (!kenyanRegex.test(cleaned)) {
+                    showValidationError(input, 'Please enter a valid Kenyan phone number (e.g., +254720547335 or 0720547335)');
                     return false;
                 }
             }
