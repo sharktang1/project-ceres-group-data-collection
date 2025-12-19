@@ -144,30 +144,31 @@ class ProjectCeresForm {
         const minDate = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
         document.getElementById('dob').min = minDate.toISOString().split('T')[0];
         
-        // Phone number handling - SIMPLIFIED - NO PATTERN VALIDATION
+        // Phone number handling - FIXED VALIDATION
         document.getElementById('phone').addEventListener('input', (e) => {
-            let value = e.target.value.replace(/\D/g, ''); // Remove all non-digits
+            let value = e.target.value;
             
-            // Convert to +254 format if starts with 0
-            if (value.startsWith('0') && value.length > 1) {
-                value = '254' + value.substring(1);
+            // Allow + at the beginning
+            if (value.startsWith('+')) {
+                // Keep + and digits only
+                value = '+' + value.substring(1).replace(/\D/g, '');
+            } else {
+                // Remove all non-digits
+                value = value.replace(/\D/g, '');
             }
             
-            // No length limit - let user type freely
-            // Format for display (optional)
-            if (value.length >= 3) {
-                e.target.value = '+' + value;
-            } else if (value.length > 0) {
-                e.target.value = value;
-            }
+            e.target.value = value;
         });
         
         // Add blur event to format on lose focus
         document.getElementById('phone').addEventListener('blur', (e) => {
             let value = e.target.value.replace(/\D/g, '');
             if (value.startsWith('254') && value.length >= 12) {
-                // Keep it simple, just show +254 prefix
+                // Format with + for international numbers
                 e.target.value = '+254' + value.substring(3);
+            } else if (value.startsWith('0') && value.length === 10) {
+                // Keep as is for local format
+                e.target.value = value;
             }
         });
         
@@ -192,19 +193,16 @@ class ProjectCeresForm {
     }
 
     formatPhoneInput(input) {
-        let value = input.value.replace(/\D/g, '');
+        let value = input.value;
         
-        // Convert to +254 format if starts with 0
-        if (value.startsWith('0') && value.length > 1) {
-            value = '254' + value.substring(1);
+        // Allow + at the beginning
+        if (value.startsWith('+')) {
+            value = '+' + value.substring(1).replace(/\D/g, '');
+        } else {
+            value = value.replace(/\D/g, '');
         }
         
-        // No length limit
-        if (value.length >= 3) {
-            input.value = '+' + value;
-        } else if (value.length > 0) {
-            input.value = value;
-        }
+        input.value = value;
         
         // Format on blur
         const originalBlur = input.onblur;
@@ -212,6 +210,8 @@ class ProjectCeresForm {
             let val = e.target.value.replace(/\D/g, '');
             if (val.startsWith('254') && val.length >= 12) {
                 e.target.value = '+254' + val.substring(3);
+            } else if (val.startsWith('0') && val.length === 10) {
+                e.target.value = val;
             }
             if (originalBlur) originalBlur.call(this, e);
         };
@@ -316,10 +316,10 @@ class ProjectCeresForm {
                     this.showValidationError(input, 'This agreement is required');
                 }
             } else if (input.type === 'tel') {
-                const value = input.value.replace(/\D/g, '');
+                const value = input.value;
                 if (!value || !this.isValidPhone(value)) {
                     isValid = false;
-                    this.showValidationError(input, 'Please enter a valid Kenyan phone number');
+                    this.showValidationError(input, 'Please enter a valid Kenyan phone number (e.g., +254720547335 or 0720547335)');
                 }
             } else if (input.type === 'date') {
                 if (!input.value) {
@@ -408,33 +408,36 @@ class ProjectCeresForm {
     }
 
     isValidPhone(phone) {
-        // Remove all non-digits
-        const cleaned = phone.replace(/\D/g, '');
-        
-        // Check if it's a valid Kenyan phone number
-        // Accept: 254 followed by 9 digits (12 total), or 0 followed by 9 digits (10 total)
-        if (cleaned.startsWith('254') && cleaned.length === 12) {
-            return /^254[17]\d{8}$/.test(cleaned);
-        } else if (cleaned.startsWith('0') && cleaned.length === 10) {
-            return /^0[17]\d{8}$/.test(cleaned);
-        } else if (cleaned.length === 9) {
-            return /^[17]\d{8}$/.test(cleaned);
+        // FIXED PHONE VALIDATION - ACCEPTS +254 FORMAT
+        // 1. Clean the input: remove all non-digit characters except a leading plus
+        let cleaned;
+        if (phone.startsWith('+')) {
+            cleaned = '+' + phone.substring(1).replace(/\D/g, '');
+        } else {
+            cleaned = phone.replace(/\D/g, '');
         }
         
-        return false;
+        // 2. Accept various Kenyan phone number formats
+        // Allow: +254XXXXXXXXX, 254XXXXXXXXX, 0XXXXXXXXX
+        const kenyanRegex = /^(?:\+?254|0)?[17]\d{8}$/;
+        
+        // Test the cleaned number against the pattern
+        return kenyanRegex.test(cleaned);
     }
 
     saveCurrentStepData() {
         switch(this.currentStep) {
             case 1:
-                const phoneValue = document.getElementById('phone').value.replace(/\D/g, '');
-                let formattedPhone = phoneValue;
+                const phoneValue = document.getElementById('phone').value;
+                let formattedPhone = phoneValue.replace(/\D/g, '');
                 
-                // Format phone to 254XXXXXXXXX
-                if (phoneValue.startsWith('0') && phoneValue.length === 10) {
-                    formattedPhone = '254' + phoneValue.substring(1);
-                } else if (phoneValue.length === 9) {
-                    formattedPhone = '254' + phoneValue;
+                // Format phone to 254XXXXXXXXX (without +)
+                if (formattedPhone.startsWith('0') && formattedPhone.length === 10) {
+                    formattedPhone = '254' + formattedPhone.substring(1);
+                } else if (formattedPhone.startsWith('254')) {
+                    // Already in 254 format
+                } else if (formattedPhone.length === 9) {
+                    formattedPhone = '254' + formattedPhone;
                 }
                 
                 this.formData.personal = {
@@ -451,14 +454,16 @@ class ProjectCeresForm {
             case 2:
                 this.formData.nextOfKin = [];
                 document.querySelectorAll('.next-of-kin-entry').forEach(entry => {
-                    const phoneVal = entry.querySelector('.nok-contact').value.replace(/\D/g, '');
-                    let formattedNokPhone = phoneVal;
+                    const phoneVal = entry.querySelector('.nok-contact').value;
+                    let formattedNokPhone = phoneVal.replace(/\D/g, '');
                     
-                    // Format next of kin phone
-                    if (phoneVal.startsWith('0') && phoneVal.length === 10) {
-                        formattedNokPhone = '254' + phoneVal.substring(1);
-                    } else if (phoneVal.length === 9) {
-                        formattedNokPhone = '254' + phoneVal;
+                    // Format next of kin phone to 254 format
+                    if (formattedNokPhone.startsWith('0') && formattedNokPhone.length === 10) {
+                        formattedNokPhone = '254' + formattedNokPhone.substring(1);
+                    } else if (formattedNokPhone.startsWith('254')) {
+                        // Already in 254 format
+                    } else if (formattedNokPhone.length === 9) {
+                        formattedNokPhone = '254' + formattedNokPhone;
                     }
                     
                     const nok = {
@@ -848,7 +853,7 @@ class ProjectCeresForm {
             // Add remove functionality
             thumbnail.querySelector('.remove-thumbnail').addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.removeLivestockPhoto(entryIndex, index);
+                this.removeLivestockPhoto(entryIndex, photoIndex);
             });
         });
     }
@@ -1167,7 +1172,8 @@ class ProjectCeresForm {
                 <div class="form-group">
                     <label>Next of Kin Contact *</label>
                     <input type="tel" class="nok-contact" name="nok-contact[]" required 
-                           placeholder="Phone number">
+                           placeholder="Phone number"
+                           inputmode="tel">
                     <div class="validation-error-message nok-contact-error">Please enter a valid phone number</div>
                 </div>
                 <div class="form-group">
@@ -1764,7 +1770,8 @@ class ProjectCeresForm {
                     <div class="form-group">
                         <label>Next of Kin Contact *</label>
                         <input type="tel" class="nok-contact" name="nok-contact[]" required 
-                               placeholder="Phone number">
+                               placeholder="Phone number"
+                               inputmode="tel">
                         <div class="validation-error-message nok-contact-error">Please enter a valid phone number</div>
                     </div>
                     <div class="form-group">
