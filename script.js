@@ -279,6 +279,14 @@ class ProjectCeresForm {
                     this.stopCamera();
                 }
                 
+                // Reinitialize signature canvas when reaching step 7
+                if (this.currentStep === 7) {
+                    setTimeout(() => {
+                        console.log('Reached step 7, reinitializing signature...');
+                        this.initializeSignature();
+                    }, 500);
+                }
+                
                 // Show step guide
                 setTimeout(() => this.showStepGuide(), 500);
             }
@@ -290,6 +298,14 @@ class ProjectCeresForm {
             this.currentStep--;
             this.updateStepIndicator();
             window.scrollTo({ top: 0, behavior: 'smooth' });
+            
+            // Reinitialize signature canvas when returning to step 7
+            if (this.currentStep === 7) {
+                setTimeout(() => {
+                    console.log('Returned to step 7, reinitializing signature...');
+                    this.initializeSignature();
+                }, 500);
+            }
         }
     }
 
@@ -853,7 +869,7 @@ class ProjectCeresForm {
             // Add remove functionality
             thumbnail.querySelector('.remove-thumbnail').addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.removeLivestockPhoto(entryIndex, photoIndex);
+                this.removeLivestockPhoto(entryIndex, index);
             });
         });
     }
@@ -876,181 +892,281 @@ class ProjectCeresForm {
         }
     }
 
-    // Signature Functionality with Mouse/Touchpad Support
+    // SIGNATURE FUNCTIONALITY - COMPLETELY FIXED VERSION
     initializeSignature() {
+        console.log('Initializing signature canvas...');
+        
         const canvas = document.getElementById('signatureCanvas');
+        const placeholder = document.getElementById('signaturePlaceholder');
+        const signaturePad = document.querySelector('.signature-pad');
+        
+        if (!canvas) {
+            console.error('Signature canvas not found!');
+            return;
+        }
+        
         const ctx = canvas.getContext('2d');
         
-        // Set canvas size
-        canvas.width = canvas.offsetWidth;
-        canvas.height = canvas.offsetHeight;
+        // State variables
+        this.isDrawing = false;
+        this.signaturePoints = [];
+        this.signatureData = null;
         
-        // Set drawing style
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        // Initialize canvas with proper dimensions
+        const initializeCanvasSize = () => {
+            // Get the actual display size of the canvas container
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const displayWidth = Math.floor(rect.width);
+            const displayHeight = Math.floor(rect.height);
+            
+            console.log('Canvas container size:', displayWidth, 'x', displayHeight);
+            
+            // Check if canvas size matches display size
+            if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+                // Save current image data if any
+                const imageData = this.signaturePoints.length > 0 ? 
+                    ctx.getImageData(0, 0, canvas.width, canvas.height) : null;
+                
+                // Set canvas to display size
+                canvas.width = displayWidth;
+                canvas.height = displayHeight;
+                
+                console.log('Canvas resized to:', canvas.width, 'x', canvas.height);
+                
+                // Set drawing context properties - BLACK INK
+                ctx.strokeStyle = '#000000'; // Pure black
+                ctx.lineWidth = 2.5; // Optimal thickness
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.fillStyle = '#000000';
+                
+                // Restore image data if any
+                if (imageData) {
+                    ctx.putImageData(imageData, 0, 0);
+                }
+            }
+        };
         
-        // Get canvas position
-        const getCanvasPosition = (e) => {
+        // Wait for DOM to be ready and canvas to be visible
+        const waitForCanvas = () => {
+            if (canvas.parentElement.clientWidth > 0 && canvas.parentElement.clientHeight > 0) {
+                initializeCanvasSize();
+            } else {
+                // Try again after a short delay
+                setTimeout(waitForCanvas, 100);
+            }
+        };
+        
+        // Initialize canvas size when step 7 is shown
+        const initializeForStep = () => {
+            if (this.currentStep === 7) {
+                // Wait a bit for the step to be fully rendered
+                setTimeout(() => {
+                    waitForCanvas();
+                }, 300);
+            }
+        };
+        
+        // Listen for step changes
+        const originalNextStep = this.nextStep;
+        const originalPrevStep = this.prevStep;
+        
+        this.nextStep = function() {
+            originalNextStep.apply(this);
+            setTimeout(() => initializeForStep.apply(this), 100);
+        };
+        
+        this.prevStep = function() {
+            originalPrevStep.apply(this);
+            setTimeout(() => initializeForStep.apply(this), 100);
+        };
+        
+        // Also initialize on page load for step 1
+        waitForCanvas();
+        
+        // Handle window resize
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                initializeCanvasSize();
+            }, 250);
+        });
+        
+        // Get canvas coordinates from event
+        const getCanvasCoordinates = (e) => {
             const rect = canvas.getBoundingClientRect();
-            let x, y;
+            let clientX, clientY;
             
             if (e.type.includes('touch')) {
-                // For touch events
-                x = e.touches[0].clientX - rect.left;
-                y = e.touches[0].clientY - rect.top;
-            } else if (e.type === 'pointer') {
-                // For pointer events (works with mouse and touchpad)
-                x = e.clientX - rect.left;
-                y = e.clientY - rect.top;
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
             } else {
-                // For mouse events
-                x = e.clientX - rect.left;
-                y = e.clientY - rect.top;
+                clientX = e.clientX;
+                clientY = e.clientY;
             }
             
-            return { x, y };
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
         };
         
         // Start drawing
         const startDrawing = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const { x, y } = getCanvasCoordinates(e);
+            
             this.isDrawing = true;
-            const { x, y } = getCanvasPosition(e);
+            signaturePad.classList.add('active');
+            placeholder.style.display = 'none';
             
-            this.signaturePoints = [[x, y]];
-            document.getElementById('signaturePlaceholder').style.display = 'none';
-            
+            // Start new path
             ctx.beginPath();
             ctx.moveTo(x, y);
+            
+            // Draw initial point
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            
+            this.signaturePoints.push([x, y]);
+            console.log('Started drawing at:', x, y);
         };
         
-        // Draw
+        // Continue drawing
         const draw = (e) => {
             if (!this.isDrawing) return;
             
-            const { x, y } = getCanvasPosition(e);
-            this.signaturePoints.push([x, y]);
+            e.preventDefault();
+            e.stopPropagation();
             
+            const { x, y } = getCanvasCoordinates(e);
+            
+            // Draw line to new position
             ctx.lineTo(x, y);
             ctx.stroke();
+            
+            this.signaturePoints.push([x, y]);
         };
         
         // Stop drawing
-        const stopDrawing = () => {
+        const stopDrawing = (e) => {
             if (this.isDrawing) {
+                e?.preventDefault();
+                e?.stopPropagation();
+                
                 this.isDrawing = false;
+                signaturePad.classList.remove('active');
+                ctx.closePath();
                 this.saveSignature();
+                
+                console.log('Stopped drawing. Total points:', this.signaturePoints.length);
             }
         };
         
-        // Mouse events
-        canvas.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            startDrawing(e);
-        });
+        // Event handlers - SINGLE SET OF HANDLERS (no conflicts)
+        const addEventHandlers = () => {
+            // Remove any existing event handlers first
+            canvas.removeEventListener('mousedown', startDrawing);
+            canvas.removeEventListener('mousemove', draw);
+            canvas.removeEventListener('mouseup', stopDrawing);
+            canvas.removeEventListener('mouseleave', stopDrawing);
+            canvas.removeEventListener('touchstart', startDrawing);
+            canvas.removeEventListener('touchmove', draw);
+            canvas.removeEventListener('touchend', stopDrawing);
+            canvas.removeEventListener('touchcancel', stopDrawing);
+            
+            // Add clean event handlers
+            // Mouse events
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseleave', stopDrawing);
+            
+            // Touch events
+            canvas.addEventListener('touchstart', startDrawing, { passive: false });
+            canvas.addEventListener('touchmove', draw, { passive: false });
+            canvas.addEventListener('touchend', stopDrawing, { passive: false });
+            canvas.addEventListener('touchcancel', stopDrawing, { passive: false });
+            
+            console.log('Signature event handlers attached');
+        };
         
-        canvas.addEventListener('mousemove', (e) => {
-            e.preventDefault();
-            draw(e);
-        });
+        // Add event handlers after canvas is initialized
+        setTimeout(addEventHandlers, 500);
         
-        canvas.addEventListener('mouseup', (e) => {
-            e.preventDefault();
-            stopDrawing();
-        });
-        
-        canvas.addEventListener('mouseout', (e) => {
-            e.preventDefault();
-            stopDrawing();
-        });
-        
-        // Touch events for mobile
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            startDrawing(e);
-        });
-        
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            draw(e);
-        });
-        
-        canvas.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            stopDrawing();
-        });
-        
-        // Pointer events for better touchpad/mouse support
-        canvas.addEventListener('pointerdown', (e) => {
-            e.preventDefault();
-            startDrawing(e);
-        });
-        
-        canvas.addEventListener('pointermove', (e) => {
-            if (!this.isDrawing) return;
-            e.preventDefault();
-            draw(e);
-        });
-        
-        canvas.addEventListener('pointerup', (e) => {
-            e.preventDefault();
-            stopDrawing();
-        });
-        
-        canvas.addEventListener('pointerout', (e) => {
-            e.preventDefault();
-            stopDrawing();
-        });
-        
-        // Clear signature button
+        // Clear signature
         document.getElementById('clearSignature').addEventListener('click', () => {
-            this.clearSignature(canvas, ctx);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            this.signaturePoints = [];
+            this.signatureData = null;
+            placeholder.style.display = 'flex';
+            console.log('Signature cleared');
         });
         
-        // Undo button
+        // Undo last stroke
         document.getElementById('undoSignature').addEventListener('click', () => {
-            this.undoSignature(canvas, ctx);
-        });
-    }
-
-    clearSignature(canvas, ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        this.signaturePoints = [];
-        this.signatureData = null;
-        document.getElementById('signaturePlaceholder').style.display = 'flex';
-        console.log('Signature cleared');
-    }
-
-    undoSignature(canvas, ctx) {
-        if (this.signaturePoints.length > 0) {
-            this.signaturePoints.pop();
-            
-            // Redraw all points
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (this.signaturePoints.length > 0) {
-                ctx.beginPath();
-                ctx.moveTo(this.signaturePoints[0][0], this.signaturePoints[0][1]);
+                // Clear and redraw all points except last stroke
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
-                for (let i = 1; i < this.signaturePoints.length; i++) {
-                    ctx.lineTo(this.signaturePoints[i][0], this.signaturePoints[i][1]);
+                if (this.signaturePoints.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(this.signaturePoints[0][0], this.signaturePoints[0][1]);
+                    
+                    for (let i = 1; i < this.signaturePoints.length - 1; i++) {
+                        ctx.lineTo(this.signaturePoints[i][0], this.signaturePoints[i][1]);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(this.signaturePoints[i][0], this.signaturePoints[i][1]);
+                    }
+                    
+                    this.signaturePoints.pop();
+                } else {
+                    this.signaturePoints = [];
+                    placeholder.style.display = 'flex';
+                    this.signatureData = null;
                 }
-                ctx.stroke();
-            } else {
-                document.getElementById('signaturePlaceholder').style.display = 'flex';
-                this.signatureData = null;
+                
+                console.log('Undo performed. Remaining points:', this.signaturePoints.length);
             }
+        });
+        
+        // Save signature as blob
+        this.saveSignature = () => {
+            canvas.toBlob((blob) => {
+                this.signatureData = blob;
+                console.log('Signature saved as blob:', blob?.size, 'bytes');
+            }, 'image/png', 1.0);
+        };
+        
+        // Override clearSignature method
+        this.clearSignature = (canvasRef, ctxRef) => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            this.signaturePoints = [];
+            this.signatureData = null;
+            placeholder.style.display = 'flex';
             
-            console.log('Last stroke undone');
-        }
-    }
-
-    saveSignature() {
-        const canvas = document.getElementById('signatureCanvas');
-        canvas.toBlob((blob) => {
-            this.signatureData = blob;
-            console.log('Signature saved');
-        }, 'image/png');
+            // Reinitialize drawing context
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            console.log('Signature cleared via override');
+        };
+        
+        // Override undoSignature method
+        this.undoSignature = (canvasRef, ctxRef) => {
+            document.getElementById('undoSignature').click();
+        };
+        
+        console.log('Signature canvas initialization complete');
     }
 
     // Location Functionality
@@ -1749,9 +1865,11 @@ class ProjectCeresForm {
         
         // Reset signature canvas
         const canvas = document.getElementById('signatureCanvas');
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        document.getElementById('signaturePlaceholder').style.display = 'flex';
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('signaturePlaceholder').style.display = 'flex';
+        }
         
         // Reset next of kin and livestock containers to single entry
         document.getElementById('nextOfKinContainer').innerHTML = `
@@ -1866,6 +1984,11 @@ class ProjectCeresForm {
         
         // Re-setup phone fields
         this.setupDynamicPhoneFields();
+        
+        // Reinitialize signature
+        setTimeout(() => {
+            this.initializeSignature();
+        }, 500);
     }
 
     // Notification System with control
