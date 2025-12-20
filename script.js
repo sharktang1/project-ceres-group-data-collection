@@ -56,6 +56,9 @@ class ProjectCeresForm {
         this.notificationsEnabled = true;
         this.shownNotifications = new Set();
         
+        // Submission state
+        this.isSubmitting = false;
+        
         this.init();
     }
 
@@ -82,13 +85,8 @@ class ProjectCeresForm {
         this.initializeLocation();
         this.updateStepIndicator();
         
-        // Set up form submission - using custom validation
-        document.getElementById('memberForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            if (this.validateCurrentStep(true)) {
-                this.submitForm();
-            }
-        });
+        // REMOVED: Don't add duplicate event listener here
+        // The HTML form already has onsubmit="submitForm()"
         
         // Show initial guide (only once)
         setTimeout(() => {
@@ -186,6 +184,18 @@ class ProjectCeresForm {
         
         // Initialize Next of Kin phone fields
         this.setupDynamicPhoneFields();
+        
+        // Set up form submission button - SINGLE EVENT LISTENER
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.submitForm();
+        });
+        
+        // Remove any inline onsubmit handler from the form
+        const form = document.getElementById('memberForm');
+        form.onsubmit = null;
+        form.setAttribute('onsubmit', 'return false;');
     }
 
     setupDynamicPhoneFields() {
@@ -1710,19 +1720,28 @@ class ProjectCeresForm {
     }
 
     // ============================================
-    // FORM SUBMISSION - UPDATED WITH FIREBASE STORAGE
+    // FORM SUBMISSION - FIXED TO PREVENT DOUBLE SUBMISSION
     // ============================================
     
     async submitForm() {
+        // Prevent double submission
+        if (this.isSubmitting) {
+            console.log('Submission already in progress, ignoring duplicate request');
+            return;
+        }
+        
         this.showNotification('Starting submission process...', 'info', true);
         
         try {
+            this.isSubmitting = true;
+            
             // Validate all steps for final submission
             for (let i = 1; i <= this.totalSteps; i++) {
                 this.currentStep = i;
                 if (!this.validateCurrentStep(true)) {
                     this.showNotification('Please complete all required fields', 'error', true);
                     this.updateStepIndicator();
+                    this.isSubmitting = false;
                     return;
                 }
             }
@@ -1873,6 +1892,7 @@ class ProjectCeresForm {
                     this.resetForm();
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Data';
+                    this.isSubmitting = false;
                 }, 5000);
                 
             } else {
@@ -1885,6 +1905,7 @@ class ProjectCeresForm {
                     this.resetForm();
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Data';
+                    this.isSubmitting = false;
                 }, 3000);
             }
             
@@ -1892,10 +1913,11 @@ class ProjectCeresForm {
             console.error('Submission error:', error);
             this.showNotification(`Submission failed: ${error.message}`, 'error', true);
             
-            // Re-enable submit button
+            // Re-enable submit button and reset submission state
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Data';
+            this.isSubmitting = false;
         }
     }
 
