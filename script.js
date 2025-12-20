@@ -112,19 +112,19 @@ class ProjectCeresForm {
             
             const { initializeApp, getFirestore, getStorage, getAnalytics } = window.firebaseModules;
             
-            // Firebase configuration for database
-            const firebaseDbConfig = {
-                apiKey: "AIzaSyBQAXb4Jv27wld9LAypBpSqqF_7WFhPp4A",
-                authDomain: "groupsdb1.firebasestorage.app",
-                projectId: "groupsdb1",
-                storageBucket: "groupsdb1.firebasestorage.app",
-                messagingSenderId: "233794413556",
-                appId: "1:233794413556:web:31648e459d6948b691cfa1",
-                measurementId: "G-HCSEFDXJ1F"
+            // Firebase configuration for autostore-58181 project
+            const firebaseConfig = {
+                apiKey: "AIzaSyAiRNS2NaZnCNOZ3r948mhsciu7f-xTkXc",
+                authDomain: "autostore-58181.firebaseapp.com",
+                projectId: "autostore-58181",
+                storageBucket: "autostore-58181.firebasestorage.app",
+                messagingSenderId: "208074075097",
+                appId: "1:208074075097:web:4dea4c511813cde7df47c8",
+                measurementId: "G-S0ZBHHKWNW"
             };
             
-            // Initialize Firebase for database
-            const app = initializeApp(firebaseDbConfig, 'databaseApp');
+            // Initialize Firebase
+            const app = initializeApp(firebaseConfig);
             this.db = getFirestore(app);
             this.storage = getStorage(app);
             this.analytics = getAnalytics(app);
@@ -705,11 +705,11 @@ class ProjectCeresForm {
         const context = canvas.getContext('2d');
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        // Convert to blob
+        // Convert to blob - FIXED: Use proper image/jpeg format
         canvas.toBlob((blob) => {
             this.profilePhotoData = blob;
             
-            // Show preview
+            // Show preview using blob URL
             const url = URL.createObjectURL(blob);
             preview.innerHTML = `<img src="${url}" alt="Profile Preview" style="width:100%;height:100%;object-fit:cover;">`;
             preview.style.display = 'flex';
@@ -1590,14 +1590,21 @@ class ProjectCeresForm {
             // Generate unique filename
             const timestamp = Date.now();
             const randomString = Math.random().toString(36).substring(2, 15);
-            const fileName = `${fileType}_${timestamp}_${randomString}`;
             
-            // Determine folder based on file type
-            let folder = 'profiles';
-            if (fileType === 'signature') folder = 'signatures';
-            if (fileType === 'livestock') folder = 'livestock';
+            // Determine folder and file extension
+            let folder = 'muthegi-group/profiles';
+            let fileExtension = 'jpg';
             
-            const storageRef = ref(this.storage, `muthegi-group/${folder}/${fileName}`);
+            if (fileType === 'signature') {
+                folder = 'muthegi-group/signatures';
+                fileExtension = 'png'; // Signatures are saved as PNG for transparency
+            } else if (fileType === 'livestock') {
+                folder = 'muthegi-group/livestock';
+                fileExtension = 'jpg';
+            }
+            
+            const fileName = `${fileType}_${timestamp}_${randomString}.${fileExtension}`;
+            const storageRef = ref(this.storage, `${folder}/${fileName}`);
             
             // Upload file
             const snapshot = await uploadBytes(storageRef, file);
