@@ -19,12 +19,14 @@ class ProjectCeresForm {
         this.formData = {
             personal: {},
             nextOfKin: [],
-            profilePhoto: null,
             location: {},
             farmerJourney: {},
             livestock: [],
-            signature: null,
-            consent: false
+            consent: false,
+            // Image URLs will be stored here after upload
+            profilePhotoUrl: null,
+            signatureUrl: null,
+            livestockPhotoUrls: []
         };
         
         // Camera states
@@ -51,6 +53,10 @@ class ProjectCeresForm {
         // Notification control
         this.notificationsEnabled = true;
         this.shownNotifications = new Set();
+        
+        // Cloudinary configuration
+        this.cloudName = 'dpymwa41m';
+        this.uploadPreset = 'muthegi_preset'; // Make sure this is correct!
         
         this.init();
     }
@@ -528,7 +534,7 @@ class ProjectCeresForm {
                         produce: entry.querySelector('.livestock-produce').value,
                         count: entry.querySelector('.livestock-count').value,
                         info: entry.querySelector('.livestock-info').value,
-                        photos: this.livestockPhotos[index] || []
+                        photoCount: this.livestockPhotos[index] ? this.livestockPhotos[index].length : 0
                     };
                     if (livestock.type || livestock.count) {
                         this.formData.livestock.push(livestock);
@@ -538,7 +544,7 @@ class ProjectCeresForm {
                 
             case 7:
                 this.formData.consent = document.getElementById('agreeConsent').checked;
-                this.formData.signature = this.signatureData;
+                // Signature URL will be added after upload
                 break;
         }
         
@@ -1145,27 +1151,6 @@ class ProjectCeresForm {
             }, 'image/png', 1.0);
         };
         
-        // Override clearSignature method
-        this.clearSignature = (canvasRef, ctxRef) => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            this.signaturePoints = [];
-            this.signatureData = null;
-            placeholder.style.display = 'flex';
-            
-            // Reinitialize drawing context
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 2.5;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            
-            console.log('Signature cleared via override');
-        };
-        
-        // Override undoSignature method
-        this.undoSignature = (canvasRef, ctxRef) => {
-            document.getElementById('undoSignature').click();
-        };
-        
         console.log('Signature canvas initialization complete');
     }
 
@@ -1552,13 +1537,32 @@ class ProjectCeresForm {
                             ${animal.count || 0} ${animal.type || 'animals'} 
                             ${animal.produce ? `- Produce: ${animal.produce}` : ''}
                             ${animal.info ? `<br><small>${animal.info}</small>` : ''}
-                            ${animal.photos && animal.photos.length > 0 ? `<br><small>${animal.photos.length} photo(s) attached</small>` : ''}
+                            ${animal.photoCount > 0 ? `<br><small>${animal.photoCount} photo(s) attached</small>` : ''}
                         </div>
                     </div>
                 `;
             });
             html += `</div>`;
         }
+        
+        // Images
+        html += `
+            <div class="profile-section">
+                <h3><i class="fas fa-images"></i> Uploaded Images</h3>
+                <div class="profile-row">
+                    <div class="profile-label">Profile Photo:</div>
+                    <div class="profile-value">${this.formData.profilePhotoUrl ? 'Uploaded ✓' : 'Not provided'}</div>
+                </div>
+                <div class="profile-row">
+                    <div class="profile-label">Signature:</div>
+                    <div class="profile-value">${this.formData.signatureUrl ? 'Uploaded ✓' : 'Not provided'}</div>
+                </div>
+                <div class="profile-row">
+                    <div class="profile-label">Livestock Photos:</div>
+                    <div class="profile-value">${this.formData.livestockPhotoUrls.length > 0 ? `${this.formData.livestockPhotoUrls.length} photo(s) uploaded ✓` : 'No photos uploaded'}</div>
+                </div>
+            </div>
+        `;
         
         // Consent
         html += `
@@ -1568,36 +1572,27 @@ class ProjectCeresForm {
                     <div class="profile-label">Consent Given:</div>
                     <div class="profile-value">${this.formData.consent ? 'Yes' : 'No'}</div>
                 </div>
-                <div class="profile-row">
-                    <div class="profile-label">Signature:</div>
-                    <div class="profile-value">${this.formData.signature ? 'Provided' : 'Not provided'}</div>
-                </div>
             </div>
         `;
         
         profileContent.innerHTML = html;
     }
 
-    // Cloudinary Upload Function
+    // ============================================
+    // CLOUDINARY UPLOAD FUNCTIONS - FIXED VERSION
+    // ============================================
+    
     async uploadToCloudinary(file, folder = 'muthegi-group') {
-        // Cloudinary configuration
-        const cloudName = 'dpymwa41m';
-        const apiKey = '126267173967732';
-        
-        // For direct uploads, you need an upload preset
-        const uploadPreset = 'muthegi_preset'; // Change this to your actual upload preset
-        
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('upload_preset', uploadPreset);
-        formData.append('folder', folder);
-        formData.append('api_key', apiKey);
-        
         try {
-            console.log(`Uploading to ${folder}...`);
+            console.log(`Uploading file to Cloudinary (${folder})...`);
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', this.uploadPreset);
+            formData.append('folder', folder);
             
             const response = await fetch(
-                `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+                `https://api.cloudinary.com/v1_1/${this.cloudName}/image/upload`,
                 {
                     method: 'POST',
                     body: formData
@@ -1610,6 +1605,8 @@ class ProjectCeresForm {
             }
             
             const data = await response.json();
+            
+            console.log('Cloudinary upload successful:', data.secure_url);
             
             return {
                 success: true,
@@ -1626,7 +1623,10 @@ class ProjectCeresForm {
         }
     }
 
-    // Firebase Save Function
+    // ============================================
+    // FIREBASE SAVE FUNCTION - FIXED VERSION
+    // ============================================
+    
     async saveToFirebase(data) {
         if (!this.firebaseInitialized || !this.db) {
             throw new Error('Firebase not initialized');
@@ -1636,28 +1636,29 @@ class ProjectCeresForm {
             const { collection, addDoc } = window.firebaseModules;
             
             const firebaseData = {
+                // Form data
                 personal: data.personal,
                 nextOfKin: data.nextOfKin,
                 location: data.location,
                 farmerJourney: data.farmerJourney,
-                livestock: data.livestock.map(animal => ({
-                    type: animal.type,
-                    produce: animal.produce,
-                    count: animal.count,
-                    info: animal.info,
-                    photoCount: animal.photos ? animal.photos.length : 0
-                })),
+                livestock: data.livestock,
                 consent: data.consent,
-                submissionDate: data.submissionDate,
-                status: data.status,
-                group: data.group,
-                project: data.project,
-                profilePhotoUrl: data.profilePhoto,
-                signatureUrl: data.signature,
-                livestockPhotoUrls: data.livestockPhotos,
+                
+                // Image URLs (uploaded to Cloudinary)
+                profilePhotoUrl: data.profilePhotoUrl,
+                signatureUrl: data.signatureUrl,
+                livestockPhotoUrls: data.livestockPhotoUrls,
+                
+                // Metadata
+                submissionDate: new Date().toISOString(),
+                status: 'submitted',
+                group: 'Muthegi Group',
+                project: 'Project Ceres',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
+            
+            console.log('Saving to Firebase:', firebaseData);
             
             const docRef = await addDoc(collection(this.db, 'muthegi-group-members'), firebaseData);
             
@@ -1702,9 +1703,12 @@ class ProjectCeresForm {
         }
     }
 
-    // Form Submission (with reduced notifications)
+    // ============================================
+    // FORM SUBMISSION - UPDATED WITH PROPER IMAGE UPLOAD
+    // ============================================
+    
     async submitForm() {
-        this.showNotification('Starting submission process...', 'warning', true);
+        this.showNotification('Starting submission process...', 'info', true);
         
         try {
             // Validate all steps for final submission
@@ -1717,78 +1721,118 @@ class ProjectCeresForm {
                 }
             }
             
-            // Save all data
+            // Save all form data
             this.saveCurrentStepData();
             
             // Disable submit button
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading Images...';
             
-            // Upload profile photo if exists
+            // ============================================
+            // STEP 1: UPLOAD ALL IMAGES TO CLOUDINARY
+            // ============================================
+            
+            this.showNotification('Uploading images to cloud...', 'info', true);
+            
+            // 1. Upload profile photo
             let profilePhotoUrl = null;
             if (this.profilePhotoData) {
-                console.log('Uploading profile photo...');
+                console.log('Uploading profile photo to Cloudinary...');
                 const uploadResult = await this.uploadToCloudinary(this.profilePhotoData, 'muthegi-group/profiles');
                 if (uploadResult.success) {
                     profilePhotoUrl = uploadResult.url;
-                    console.log('Profile photo uploaded successfully!');
+                    this.formData.profilePhotoUrl = profilePhotoUrl;
+                    console.log('Profile photo uploaded:', profilePhotoUrl);
+                    this.showNotification('Profile photo uploaded ✓', 'success', true);
                 } else {
                     console.error('Failed to upload profile photo:', uploadResult.error);
+                    this.showNotification('Failed to upload profile photo. Data will be saved without image.', 'warning', true);
                 }
             }
             
-            // Upload livestock photos
-            const livestockPhotoUrls = [];
-            for (let i = 0; i < this.livestockPhotos.length; i++) {
-                const photos = this.livestockPhotos[i];
-                if (photos && photos.length > 0) {
-                    for (let j = 0; j < photos.length; j++) {
-                        console.log(`Uploading livestock photo ${j + 1} of ${photos.length}...`);
-                        const uploadResult = await this.uploadToCloudinary(photos[j], 'muthegi-group/livestock');
-                        if (uploadResult.success) {
-                            livestockPhotoUrls.push({
-                                livestockIndex: i,
-                                url: uploadResult.url
-                            });
-                            console.log(`Livestock photo ${j + 1} uploaded`);
-                        } else {
-                            console.error(`Failed to upload livestock photo ${j + 1}:`, uploadResult.error);
-                        }
-                    }
-                }
-            }
-            
-            // Upload signature if exists
+            // 2. Upload signature
             let signatureUrl = null;
             if (this.signatureData) {
-                console.log('Uploading signature...');
+                console.log('Uploading signature to Cloudinary...');
                 const uploadResult = await this.uploadToCloudinary(this.signatureData, 'muthegi-group/signatures');
                 if (uploadResult.success) {
                     signatureUrl = uploadResult.url;
-                    console.log('Signature uploaded successfully!');
+                    this.formData.signatureUrl = signatureUrl;
+                    console.log('Signature uploaded:', signatureUrl);
+                    this.showNotification('Signature uploaded ✓', 'success', true);
+                } else {
+                    console.error('Failed to upload signature:', uploadResult.error);
+                    this.showNotification('Failed to upload signature. Data will be saved without signature.', 'warning', true);
                 }
             }
             
-            // Prepare final data
-            const memberData = {
+            // 3. Upload livestock photos
+            this.formData.livestockPhotoUrls = [];
+            let totalLivestockPhotos = 0;
+            let uploadedLivestockPhotos = 0;
+            
+            // Count total photos
+            for (let i = 0; i < this.livestockPhotos.length; i++) {
+                if (this.livestockPhotos[i]) {
+                    totalLivestockPhotos += this.livestockPhotos[i].length;
+                }
+            }
+            
+            if (totalLivestockPhotos > 0) {
+                this.showNotification(`Uploading ${totalLivestockPhotos} livestock photo(s)...`, 'info', true);
+                
+                for (let i = 0; i < this.livestockPhotos.length; i++) {
+                    const photos = this.livestockPhotos[i];
+                    if (photos && photos.length > 0) {
+                        for (let j = 0; j < photos.length; j++) {
+                            console.log(`Uploading livestock photo ${uploadedLivestockPhotos + 1} of ${totalLivestockPhotos}...`);
+                            const uploadResult = await this.uploadToCloudinary(photos[j], 'muthegi-group/livestock');
+                            if (uploadResult.success) {
+                                this.formData.livestockPhotoUrls.push({
+                                    livestockIndex: i,
+                                    photoIndex: j,
+                                    url: uploadResult.url,
+                                    uploadedAt: new Date().toISOString()
+                                });
+                                uploadedLivestockPhotos++;
+                                console.log(`Livestock photo ${uploadedLivestockPhotos} uploaded:`, uploadResult.url);
+                            } else {
+                                console.error(`Failed to upload livestock photo ${uploadedLivestockPhotos + 1}:`, uploadResult.error);
+                            }
+                        }
+                    }
+                }
+                
+                if (uploadedLivestockPhotos > 0) {
+                    this.showNotification(`${uploadedLivestockPhotos} livestock photo(s) uploaded ✓`, 'success', true);
+                }
+            }
+            
+            // ============================================
+            // STEP 2: SAVE COMPLETE DATA TO FIREBASE
+            // ============================================
+            
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving Data...';
+            this.showNotification('Saving data to database...', 'info', true);
+            
+            // Add metadata to form data
+            const completeFormData = {
                 ...this.formData,
-                profilePhoto: profilePhotoUrl,
-                livestockPhotos: livestockPhotoUrls,
-                signature: signatureUrl,
                 submissionDate: new Date().toISOString(),
                 status: 'submitted',
                 group: 'Muthegi Group',
-                project: 'Project Ceres'
+                project: 'Project Ceres',
+                totalLivestockPhotos: uploadedLivestockPhotos
             };
             
             // Save to Firebase
             let firebaseResult = null;
             if (this.firebaseInitialized) {
                 try {
-                    console.log('Saving data to database...');
-                    firebaseResult = await this.saveToFirebase(memberData);
-                    this.showNotification('Data submitted successfully!', 'success', true);
+                    console.log('Saving complete data to Firebase...');
+                    firebaseResult = await this.saveToFirebase(completeFormData);
+                    console.log('Firebase save result:', firebaseResult);
                 } catch (firebaseError) {
                     console.error('Firebase save failed:', firebaseError);
                     firebaseResult = { success: false, error: firebaseError.message };
@@ -1796,24 +1840,47 @@ class ProjectCeresForm {
             }
             
             // Save locally as backup
-            const localResult = this.saveToLocalStorage(memberData);
+            const localResult = this.saveToLocalStorage(completeFormData);
             if (localResult.success) {
-                console.log('Data backed up locally');
+                console.log('Data backed up locally with key:', localResult.key);
             }
             
-            // Show final message
+            // ============================================
+            // STEP 3: SHOW FINAL RESULT
+            // ============================================
+            
             if (firebaseResult && firebaseResult.success) {
-                this.showNotification('Form submitted successfully! Thank you.', 'success', true);
+                this.showNotification('Form submitted successfully! Data saved to database.', 'success', true);
+                console.log('Form submission complete. Document ID:', firebaseResult.docId);
+                
+                // Show success message with details
+                setTimeout(() => {
+                    this.showNotification(
+                        `Thank you! Your data has been saved. ${uploadedLivestockPhotos > 0 ? uploadedLivestockPhotos + ' livestock photos uploaded.' : ''}`,
+                        'success',
+                        true
+                    );
+                }, 1000);
+                
+                // Reset form after 5 seconds
+                setTimeout(() => {
+                    this.resetForm();
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Data';
+                }, 5000);
+                
             } else {
-                this.showNotification('Form submitted! Data saved locally.', 'warning', true);
+                // Firebase failed but local save worked
+                this.showNotification('Form submitted! Data saved locally (database connection failed).', 'warning', true);
+                console.log('Local backup saved with key:', localResult.key);
+                
+                // Reset form after 3 seconds
+                setTimeout(() => {
+                    this.resetForm();
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Data';
+                }, 3000);
             }
-            
-            // Reset form after 3 seconds
-            setTimeout(() => {
-                this.resetForm();
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Data';
-            }, 3000);
             
         } catch (error) {
             console.error('Submission error:', error);
@@ -1831,12 +1898,13 @@ class ProjectCeresForm {
         this.formData = {
             personal: {},
             nextOfKin: [],
-            profilePhoto: null,
             location: {},
             farmerJourney: {},
             livestock: [],
-            signature: null,
-            consent: false
+            consent: false,
+            profilePhotoUrl: null,
+            signatureUrl: null,
+            livestockPhotoUrls: []
         };
         
         this.profilePhotoData = null;
