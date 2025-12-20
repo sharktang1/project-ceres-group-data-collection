@@ -5,9 +5,10 @@ firebaseScript.type = 'module';
 firebaseScript.innerHTML = `
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
   import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+  import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-storage.js";
   import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-analytics.js";
   
-  window.firebaseModules = { initializeApp, getFirestore, collection, addDoc, getAnalytics };
+  window.firebaseModules = { initializeApp, getFirestore, collection, addDoc, getStorage, ref, uploadBytes, getDownloadURL, getAnalytics };
 `;
 document.head.appendChild(firebaseScript);
 
@@ -47,16 +48,13 @@ class ProjectCeresForm {
         
         // Firebase
         this.db = null;
+        this.storage = null;
         this.analytics = null;
         this.firebaseInitialized = false;
         
         // Notification control
         this.notificationsEnabled = true;
         this.shownNotifications = new Set();
-        
-        // Cloudinary configuration
-        this.cloudName = 'dpymwa41m';
-        this.uploadPreset = 'muthegi_preset'; // Make sure this is correct!
         
         this.init();
     }
@@ -112,10 +110,10 @@ class ProjectCeresForm {
                 checkFirebase();
             });
             
-            const { initializeApp, getFirestore, getAnalytics } = window.firebaseModules;
+            const { initializeApp, getFirestore, getStorage, getAnalytics } = window.firebaseModules;
             
-            // Firebase configuration
-            const firebaseConfig = {
+            // Firebase configuration for database
+            const firebaseDbConfig = {
                 apiKey: "AIzaSyBQAXb4Jv27wld9LAypBpSqqF_7WFhPp4A",
                 authDomain: "groupsdb1.firebasestorage.app",
                 projectId: "groupsdb1",
@@ -125,13 +123,14 @@ class ProjectCeresForm {
                 measurementId: "G-HCSEFDXJ1F"
             };
             
-            // Initialize Firebase
-            const app = initializeApp(firebaseConfig);
+            // Initialize Firebase for database
+            const app = initializeApp(firebaseDbConfig, 'databaseApp');
             this.db = getFirestore(app);
+            this.storage = getStorage(app);
             this.analytics = getAnalytics(app);
             this.firebaseInitialized = true;
             
-            console.log('Firebase initialized successfully');
+            console.log('Firebase initialized successfully for database and storage');
             
         } catch (error) {
             console.error('Firebase initialization error:', error);
@@ -1579,43 +1578,43 @@ class ProjectCeresForm {
     }
 
     // ============================================
-    // CLOUDINARY UPLOAD FUNCTIONS - FIXED VERSION
+    // FIREBASE STORAGE UPLOAD FUNCTIONS
     // ============================================
     
-    async uploadToCloudinary(file, folder = 'muthegi-group') {
+    async uploadToFirebaseStorage(file, fileType = 'profile') {
         try {
-            console.log(`Uploading file to Cloudinary (${folder})...`);
+            console.log(`Uploading ${fileType} to Firebase Storage...`);
             
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('upload_preset', this.uploadPreset);
-            formData.append('folder', folder);
+            const { ref, uploadBytes, getDownloadURL } = window.firebaseModules;
             
-            const response = await fetch(
-                `https://api.cloudinary.com/v1_1/${this.cloudName}/image/upload`,
-                {
-                    method: 'POST',
-                    body: formData
-                }
-            );
+            // Generate unique filename
+            const timestamp = Date.now();
+            const randomString = Math.random().toString(36).substring(2, 15);
+            const fileName = `${fileType}_${timestamp}_${randomString}`;
             
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error?.message || `Upload failed with status: ${response.status}`);
-            }
+            // Determine folder based on file type
+            let folder = 'profiles';
+            if (fileType === 'signature') folder = 'signatures';
+            if (fileType === 'livestock') folder = 'livestock';
             
-            const data = await response.json();
+            const storageRef = ref(this.storage, `muthegi-group/${folder}/${fileName}`);
             
-            console.log('Cloudinary upload successful:', data.secure_url);
+            // Upload file
+            const snapshot = await uploadBytes(storageRef, file);
+            
+            // Get download URL
+            const downloadURL = await getDownloadURL(snapshot.ref);
+            
+            console.log(`${fileType} uploaded successfully:`, downloadURL);
             
             return {
                 success: true,
-                url: data.secure_url,
-                publicId: data.public_id,
-                data: data
+                url: downloadURL,
+                fileName: fileName,
+                fileType: fileType
             };
         } catch (error) {
-            console.error('Cloudinary upload error:', error);
+            console.error(`Firebase Storage upload error (${fileType}):`, error);
             return {
                 success: false,
                 error: error.message
@@ -1624,7 +1623,7 @@ class ProjectCeresForm {
     }
 
     // ============================================
-    // FIREBASE SAVE FUNCTION - FIXED VERSION
+    // FIREBASE FIRESTORE SAVE FUNCTION
     // ============================================
     
     async saveToFirebase(data) {
@@ -1644,7 +1643,7 @@ class ProjectCeresForm {
                 livestock: data.livestock,
                 consent: data.consent,
                 
-                // Image URLs (uploaded to Cloudinary)
+                // Image URLs (uploaded to Firebase Storage)
                 profilePhotoUrl: data.profilePhotoUrl,
                 signatureUrl: data.signatureUrl,
                 livestockPhotoUrls: data.livestockPhotoUrls,
@@ -1704,7 +1703,7 @@ class ProjectCeresForm {
     }
 
     // ============================================
-    // FORM SUBMISSION - UPDATED WITH PROPER IMAGE UPLOAD
+    // FORM SUBMISSION - UPDATED WITH FIREBASE STORAGE
     // ============================================
     
     async submitForm() {
@@ -1730,16 +1729,16 @@ class ProjectCeresForm {
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading Images...';
             
             // ============================================
-            // STEP 1: UPLOAD ALL IMAGES TO CLOUDINARY
+            // STEP 1: UPLOAD ALL IMAGES TO FIREBASE STORAGE
             // ============================================
             
-            this.showNotification('Uploading images to cloud...', 'info', true);
+            this.showNotification('Uploading images to storage...', 'info', true);
             
             // 1. Upload profile photo
             let profilePhotoUrl = null;
             if (this.profilePhotoData) {
-                console.log('Uploading profile photo to Cloudinary...');
-                const uploadResult = await this.uploadToCloudinary(this.profilePhotoData, 'muthegi-group/profiles');
+                console.log('Uploading profile photo to Firebase Storage...');
+                const uploadResult = await this.uploadToFirebaseStorage(this.profilePhotoData, 'profile');
                 if (uploadResult.success) {
                     profilePhotoUrl = uploadResult.url;
                     this.formData.profilePhotoUrl = profilePhotoUrl;
@@ -1754,8 +1753,8 @@ class ProjectCeresForm {
             // 2. Upload signature
             let signatureUrl = null;
             if (this.signatureData) {
-                console.log('Uploading signature to Cloudinary...');
-                const uploadResult = await this.uploadToCloudinary(this.signatureData, 'muthegi-group/signatures');
+                console.log('Uploading signature to Firebase Storage...');
+                const uploadResult = await this.uploadToFirebaseStorage(this.signatureData, 'signature');
                 if (uploadResult.success) {
                     signatureUrl = uploadResult.url;
                     this.formData.signatureUrl = signatureUrl;
@@ -1787,7 +1786,7 @@ class ProjectCeresForm {
                     if (photos && photos.length > 0) {
                         for (let j = 0; j < photos.length; j++) {
                             console.log(`Uploading livestock photo ${uploadedLivestockPhotos + 1} of ${totalLivestockPhotos}...`);
-                            const uploadResult = await this.uploadToCloudinary(photos[j], 'muthegi-group/livestock');
+                            const uploadResult = await this.uploadToFirebaseStorage(photos[j], 'livestock');
                             if (uploadResult.success) {
                                 this.formData.livestockPhotoUrls.push({
                                     livestockIndex: i,
@@ -1810,7 +1809,7 @@ class ProjectCeresForm {
             }
             
             // ============================================
-            // STEP 2: SAVE COMPLETE DATA TO FIREBASE
+            // STEP 2: SAVE COMPLETE DATA TO FIREBASE FIRESTORE
             // ============================================
             
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving Data...';
